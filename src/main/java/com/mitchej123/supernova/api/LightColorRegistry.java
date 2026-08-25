@@ -149,8 +149,16 @@ public final class LightColorRegistry {
             return ((ColoredLightSource) block).getColoredLightEmission(meta);
         }
 
-        // EasyColoredLights auto-detect
-        final int rawLight = block.getLightValue(world, x, y, z);
+        // EasyColoredLights auto-detect. The positional overload runs third-party block code
+        // that may not tolerate a missing TileEntity -- e.g. Ex Nihilo's crucible NPEs when
+        // queried between the block being set and its TE registering -- so degrade to the
+        // non-positional variant instead of crashing the caller.
+        int rawLight;
+        try {
+            rawLight = block.getLightValue(world, x, y, z);
+        } catch (final Throwable t) {
+            rawLight = block.getLightValue();
+        }
         if (rawLight > 15) {
             final int ecl = decodeECL(rawLight);
             if (ecl != 0) return ecl;
