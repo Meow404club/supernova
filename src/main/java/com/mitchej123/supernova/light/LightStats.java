@@ -1,6 +1,7 @@
 package com.mitchej123.supernova.light;
 
 import com.mitchej123.supernova.Supernova;
+import com.mitchej123.supernova.config.SupernovaConfig;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -76,12 +77,14 @@ public final class LightStats {
     public LightStats(final boolean isClient) {
         this.side = isClient ? "CLIENT" : "SERVER";
         PrintWriter pw = null;
-        try {
-            final File logFile = new File("logs/supernova-stats.log");
-            logFile.getParentFile().mkdirs();
-            pw = new PrintWriter(new FileWriter(logFile, true), true);
-        } catch (final IOException e) {
-            Supernova.LOG.error("Failed to open supernova-stats.log", e);
+        if (SupernovaConfig.enableStatsLog) {
+            try {
+                final File logFile = new File("logs/supernova-stats.log");
+                logFile.getParentFile().mkdirs();
+                pw = new PrintWriter(new FileWriter(logFile, true), true);
+            } catch (final IOException e) {
+                Supernova.LOG.error("Failed to open supernova-stats.log", e);
+            }
         }
         this.writer = pw;
     }
