@@ -4,6 +4,7 @@ import com.mitchej123.supernova.light.SWMRNibbleArray;
 import com.mitchej123.supernova.light.SupernovaChunk;
 import com.mitchej123.supernova.util.WorldUtil;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.IChunkProvider;
@@ -68,15 +69,49 @@ public final class ColoredLightHelper {
 
     /** Delegates to the currently active {@link TintBlendMode}. */
     static void computeTint(float br, float bg, float bb, float sr, float sg, float sb, float[] out) {
-        // Combine block and sky light per-channel with max before computing the tint ratio: a colored
-        // light source must never darken a channel below the sky/ambient level (#19 -- glowstone-lit
-        // blocks looked darker than pure skylit neighbours in direct sunlight). Color only shows where
-        // the block light exceeds ambient (night, shade, indoors). Sky is passed as zero so every blend
-        // mode degenerates to normalizing the combined color.
-        final float cr = Math.max(br, sr);
-        final float cg = Math.max(bg, sg);
-        final float cb = Math.max(bb, sb);
-        activeTintFunction.computeTint(cr, cg, cb, 0f, 0f, 0f, out);
+        combineAndCompute(activeTintFunction, br, bg, bb, sr, sg, sb, out);
+    }
+
+    /**
+     * Skylight subtraction derived from the celestial angle, replicating {@code World.calculateSkylightSubtracted}. Computed live instead of reading
+     * {@code world.skylightSubtracted} because the client-side field is not reliably ticked, and Angelica bakes whatever it last read into mesh tints.
+     * Skyless dimensions (Nether etc.) return 15 so that no sky ambient survives the subtraction -- colored light shows at full strength there.
+     */
+    public static float currentSkylightSubtracted() {
+        final World world;
+        try {
+            world = Minecraft.getMinecraft().theWorld;
+        } catch (final NoClassDefFoundError e) {
+            return 0f; // headless unit-test environment: no client classes, treat as full daylight
+        }
+        if (world == null) return 0f;
+        if (world.provider.hasNoSky) return 15f;
+        float f = 1.0f - (MathHelper.cos(world.getCelestialAngle(1.0f) * (float) Math.PI * 2.0f) * 2.0f + 0.2f);
+        f = MathHelper.clamp_float(f, 0.0f, 1.0f);
+        f = 1.0f - f;
+        // Thunderstorms imply rain; vanilla additionally darkens by thunderStrength but rain covers the effect closely enough here
+        f *= 1.0f - world.getRainStrength(1.0f) * 5.0f / 16.0f;
+        f = 1.0f - f;
+        return f * 11.0f;
+    }
+
+    /**
+     * Take the per-channel max of block and sky light, then delegate to {@code fn} with sky zeroed: a colored light source must never darken a channel below
+     * the sky/ambient level (#19 -- glowstone-lit blocks looked darker than pure skylit neighbours in direct sunlight). Color only shows where the block light
+     * exceeds ambient (night, shade, indoors). Callers pass RAW (unsubtracted) sky; the time-of-day subtraction is applied here from the celestial angle.
+     * Shared by the vanilla path and the Angelica-registered modes so both pipelines apply identical semantics.
+     */
+    public static void combineAndCompute(final TintFunction fn, final float br, final float bg, final float bb, final float sr, final float sg, final float sb,
+            final float[] out) {
+        final float sub = currentSkylightSubtracted();
+        fn.computeTint(
+                Math.max(br, Math.max(0, sr - sub)),
+                Math.max(bg, Math.max(0, sg - sub)),
+                Math.max(bb, Math.max(0, sb - sub)),
+                0f,
+                0f,
+                0f,
+                out);
     }
 
     /**
@@ -113,14 +148,9 @@ public final class ColoredLightHelper {
         final int maxBlock = Math.max(maxBlockR, Math.max(maxBlockG, maxBlockB));
         if (maxBlock == 0 && maxSkyR == 0 && maxSkyG == 0 && maxSkyB == 0) return NO_TINT;
 
-        // Sky contribution modulated by time of day
-        final float sub = world.skylightSubtracted;
-        final float effSkyR = Math.max(0, maxSkyR - sub);
-        final float effSkyG = Math.max(0, maxSkyG - sub);
-        final float effSkyB = Math.max(0, maxSkyB - sub);
-
+        // Raw sky -- computeTint applies the time-of-day subtraction itself
         final float[] result = RESULT;
-        computeTint(maxBlockR, maxBlockG, maxBlockB, effSkyR, effSkyG, effSkyB, result);
+        computeTint(maxBlockR, maxBlockG, maxBlockB, maxSkyR, maxSkyG, maxSkyB, result);
         if (result[0] >= 1.0f && result[1] >= 1.0f && result[2] >= 1.0f) return NO_TINT;
         return result;
     }
@@ -147,7 +177,6 @@ public final class ColoredLightHelper {
         final int fcy = y + normal[1];
         final int fcz = z + normal[2];
 
-        final float sub = world.skylightSubtracted;
         final float[][] vertexTints = VERTEX_TINTS;
 
         for (int corner = 0; corner < 4; corner++) {
@@ -170,9 +199,9 @@ public final class ColoredLightHelper {
                     totalBlockR += packed & 0xF;
                     totalBlockG += (packed >> 4) & 0xF;
                     totalBlockB += (packed >> 8) & 0xF;
-                    totalSkyR += Math.max(0, ((packed >> 12) & 0xF) - sub);
-                    totalSkyG += Math.max(0, ((packed >> 16) & 0xF) - sub);
-                    totalSkyB += Math.max(0, ((packed >> 20) & 0xF) - sub);
+                    totalSkyR += (packed >> 12) & 0xF;
+                    totalSkyG += (packed >> 16) & 0xF;
+                    totalSkyB += (packed >> 20) & 0xF;
                     samples++;
                 }
             }

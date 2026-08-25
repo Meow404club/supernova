@@ -27,4 +27,12 @@ public final class SnapshotChunkMap {
         return snapshot.get(key);
     }
 
+    /**
+     * Snapshot of the current chunk collection -- safe to iterate from any thread while the map is mutated on the owner thread, since mutations replace
+     * {@code snapshot} wholesale instead of modifying it.
+     */
+    public java.util.Collection<Chunk> values() {
+        return snapshot.values();
+    }
+
 }

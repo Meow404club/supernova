@@ -2,10 +2,12 @@ package com.mitchej123.supernova;
 
 import com.gtnewhorizon.gtnhlib.config.ConfigException;
 import com.gtnewhorizon.gtnhlib.config.ConfigurationManager;
+import com.mitchej123.supernova.client.ColoredLightHelper;
 import com.mitchej123.supernova.client.TintBlendMode;
 import com.mitchej123.supernova.compat.angelica.AngelicaCompat;
 import com.mitchej123.supernova.config.SupernovaClientConfig;
 import com.mitchej123.supernova.config.SupernovaConfig;
+import com.mitchej123.supernova.world.SupernovaWorld;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Loader;
@@ -27,6 +29,7 @@ public class ClientProxy extends CommonProxy {
 
     private static KeyBinding tintModeKeyBinding;
     private static boolean angelicaLoaded;
+    private int lastSkylightSubtracted = -1;
 
     @Override
     public void preInit(FMLPreInitializationEvent event) {
@@ -75,6 +78,26 @@ public class ClientProxy extends CommonProxy {
             }
             if (Minecraft.getMinecraft().renderGlobal != null) {
                 Minecraft.getMinecraft().renderGlobal.loadRenderers();
+            }
+        }
+
+        // Angelica bakes skylightSubtracted into the vertex tint at mesh time (cachedSkylightSubtracted)
+        // and never refreshes it, so colored light washes out to white when day turns to night. Mark all
+        // loaded chunks dirty whenever the factor changes so meshes rebuild with the current value. Iris
+        // solves this by passing held light color and day factor as per-frame uniforms; until Angelica
+        // offers an equivalent draw-time hook, periodic rebuilds are the only way to keep tints in sync.
+        if (angelicaLoaded) {
+            final net.minecraft.world.World world = Minecraft.getMinecraft().theWorld;
+            if (world != null) {
+                // Track OUR computed factor, not world.skylightSubtracted -- the client-side field is
+                // not reliably ticked and never changes, which silently disabled this trigger before.
+                final int sub = (int) ColoredLightHelper.currentSkylightSubtracted();
+                if (sub != this.lastSkylightSubtracted) {
+                    if (this.lastSkylightSubtracted != -1) {
+                        ((SupernovaWorld) world).supernova$getLightManager().markAllChunksForRenderUpdate();
+                    }
+                    this.lastSkylightSubtracted = sub;
+                }
             }
         }
     }

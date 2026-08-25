@@ -68,15 +68,12 @@ class ColoredLightHelperTest {
 
     @Test
     void testDominantBlockLight() {
-        // Block=15 red, sky=2 white -> block dominates
+        // Block=15 red dominates; the dim ambient sky (2) fills the darker channels through the
+        // per-channel max -- a light source may only brighten, never darken a channel (#19).
         float[] result = tint(15, 0, 0, 2, 2, 2);
-        // bm2=225, sm2=4, total=225+4+0.001≈229
-        // bw≈0.983, sw≈0.017
-        // bt=(1,0,0), st=(1,1,1)
-        // result ≈ (0.983+0.017, 0.017, 0.017) ≈ (1.0, 0.017, 0.017)
         assertEquals(1.0f, result[0], 0.01f);
-        assertTrue(result[1] < 0.05f, "green should be near zero: " + result[1]);
-        assertTrue(result[2] < 0.05f, "blue should be near zero: " + result[2]);
+        assertEquals(2f / 15f, result[1], EPSILON);
+        assertEquals(2f / 15f, result[2], EPSILON);
     }
 
     @Test
@@ -106,14 +103,12 @@ class ColoredLightHelperTest {
 
     @Test
     void testSymmetricColorsEqualWeight() {
-        // Block=red at 10, sky=blue at 10 -> equal weights
+        // Block=red at 10, sky=blue at 10 -- the per-channel max keeps both channels at full
+        // strength instead of weight-blending them, so the result is pure magenta.
         float[] result = tint(10, 0, 0, 0, 0, 10);
-        // bm2=sm2=100, bw=sw=0.5 (approx)
-        // bt=(1,0,0), st=(0,0,1)
-        // result ≈ (0.5, 0, 0.5)
-        assertEquals(result[0], result[2], 0.01f);
+        assertEquals(1.0f, result[0], 0.01f);
         assertEquals(0f, result[1], EPSILON);
-        assertTrue(result[0] > 0.45f && result[0] < 0.55f, "expected ~0.5: " + result[0]);
+        assertEquals(1.0f, result[2], 0.01f);
     }
 
     @Test

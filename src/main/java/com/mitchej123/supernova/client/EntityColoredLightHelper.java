@@ -44,12 +44,8 @@ public final class EntityColoredLightHelper {
         final int maxBlock = Math.max(br, Math.max(bg, bb));
         if (maxBlock == 0 && sr == 0 && sg == 0 && sb == 0) return NO_TINT;
 
-        final float sub = world.skylightSubtracted;
-        final float effSkyR = Math.max(0, sr - sub);
-        final float effSkyG = Math.max(0, sg - sub);
-        final float effSkyB = Math.max(0, sb - sub);
-
-        ColoredLightHelper.computeTint(br, bg, bb, effSkyR, effSkyG, effSkyB, RESULT);
+        // Raw sky -- computeTint applies the time-of-day subtraction itself
+        ColoredLightHelper.computeTint(br, bg, bb, sr, sg, sb, RESULT);
         if (RESULT[0] >= 1.0f && RESULT[1] >= 1.0f && RESULT[2] >= 1.0f) return NO_TINT;
 
         // Square the tint to increase color saturation

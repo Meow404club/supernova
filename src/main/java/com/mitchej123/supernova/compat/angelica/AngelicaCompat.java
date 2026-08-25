@@ -21,7 +21,11 @@ public class AngelicaCompat {
 
         firstOrdinal = TintRegistry.getModeCount();
         for (TintBlendMode mode : TintBlendMode.values()) {
-            TintRegistry.registerMode(mode.name(), mode::computeTint);
+            // Wrap with the shared per-channel block/sky max combine -- Angelica's applyBlockLightTint calls
+            // these modes directly with raw block and sky RGB, bypassing ColoredLightHelper.computeTint.
+            TintRegistry.registerMode(
+                    mode.name(),
+                    (br, bg, bb, sr, sg, sb, out) -> ColoredLightHelper.combineAndCompute(mode::computeTint, br, bg, bb, sr, sg, sb, out));
         }
         // Set the active mode from config
         TintRegistry.setCurrentByOrdinal(firstOrdinal + TintBlendMode.current.ordinal());

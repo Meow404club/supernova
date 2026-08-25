@@ -133,6 +133,23 @@ public final class WorldLightManager {
         this.loadedChunkMap.put(CoordinateUtils.getChunkKey(chunk.xPosition, chunk.zPosition), chunk);
     }
 
+    /**
+     * Mark every loaded chunk fully dirty for re-meshing. Used when a value baked into vertex tints at mesh time changes globally (Angelica's cached
+     * skylightSubtracted); unlike {@code renderGlobal.loadRenderers()} these marks reach Angelica's Celeritas pipeline, which rebuilds on them.
+     */
+    public void markAllChunksForRenderUpdate() {
+        if (!this.world.isRemote) return;
+        for (final Chunk chunk : this.loadedChunkMap.values()) {
+            this.world.markBlockRangeForRenderUpdate(
+                    chunk.xPosition << 4,
+                    WorldUtil.getMinBlockY(),
+                    chunk.zPosition << 4,
+                    (chunk.xPosition << 4) | 15,
+                    WorldUtil.getMaxBlockY(),
+                    (chunk.zPosition << 4) | 15);
+        }
+    }
+
     public void unregisterChunk(final int cx, final int cz) {
         this.loadedChunkMap.remove(CoordinateUtils.getChunkKey(cx, cz));
     }
