@@ -3,16 +3,22 @@ package com.mitchej123.supernova.light;
 import java.util.Arrays;
 import java.util.function.LongConsumer;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+
 /**
  * Queue for section coordinates that need render updates. Worker threads (sky + block) offer packed coordinates; the main thread drains them in batch.
  * <p>
  * Double-buffered: drain swaps in a pre-allocated buffer so producers aren't blocked during iteration. Growable to handle chunk loading bursts.
+ * <p>
+ * Duplicate offers within one drain interval are collapsed: both engines mark the same section after a
+ * position change, and BFS passes touch sections repeatedly -- the renderer only needs one rebuild.
  */
 public final class RenderUpdateQueue {
 
     private long[] writeBuffer;
     private int writeSize;
     private long[] drainBuffer;
+    private final LongOpenHashSet queued = new LongOpenHashSet();
 
     public RenderUpdateQueue() {
         this(4096);
@@ -24,6 +30,7 @@ public final class RenderUpdateQueue {
     }
 
     public synchronized void offer(final long value) {
+        if (!this.queued.add(value)) return;
         if (this.writeSize == this.writeBuffer.length) {
             this.writeBuffer = Arrays.copyOf(this.writeBuffer, this.writeBuffer.length * 2);
         }
@@ -45,6 +52,8 @@ public final class RenderUpdateQueue {
             // Swap in the drain buffer for producers; grow if needed
             this.writeBuffer = this.drainBuffer.length >= count ? this.drainBuffer : new long[snapshot.length];
             this.writeSize = 0;
+            // Everything offered so far leaves the dedupe window together with the snapshot
+            this.queued.clear();
         }
         for (int i = 0; i < count; i++) {
             action.accept(snapshot[i]);

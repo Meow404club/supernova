@@ -72,6 +72,8 @@ public abstract class SupernovaEngine {
     protected final ExtendedBlockStorage[] sectionCache;
     protected final SWMRNibbleArray[] nibbleCache;
     protected final boolean[] notifyUpdateCache;
+    /** Per-section bitmask of which faces a light change touched (see FACE_* constants); drives boundary-aware render notification. */
+    protected final byte[] notifyFaceMask;
     protected final Chunk[] chunkCache = new Chunk[5 * 5];
     protected final boolean[][] emptinessMapCache = new boolean[5 * 5][];
     private int[] dirtyIndicesBuffer = new int[64];
@@ -157,6 +159,7 @@ public abstract class SupernovaEngine {
         this.sectionCache = new ExtendedBlockStorage[cacheSize];
         this.nibbleCache = new SWMRNibbleArray[cacheSize];
         this.notifyUpdateCache = new boolean[cacheSize];
+        this.notifyFaceMask = new byte[cacheSize];
         this.blockB1Cache = new byte[cacheSize][];
         this.blockB2LowCache = new NibbleArray[cacheSize];
         this.blockMaskCache = new int[cacheSize];
@@ -302,6 +305,7 @@ public abstract class SupernovaEngine {
         Arrays.fill(this.blockMaskCache, 0);
         if (this.isClientSide) {
             Arrays.fill(this.notifyUpdateCache, false);
+            Arrays.fill(this.notifyFaceMask, (byte) 0);
         }
         this.queueOverflowWarned = false;
         this.queueOverflowed = false;
@@ -370,23 +374,51 @@ public abstract class SupernovaEngine {
         final int sectionIndex = (worldX >> 4) + 5 * (worldZ >> 4) + (5 * 5) * (worldY >> 4) + this.chunkSectionIndexOffset;
         final SWMRNibbleArray nibble = this.nibbleCache[sectionIndex];
         if (nibble != null) {
-            nibble.set((worldX & 15) | ((worldZ & 15) << 4) | ((worldY & 15) << 8), level);
-            this.postLightUpdate(sectionIndex);
+            final int localIndex = (worldX & 15) | ((worldZ & 15) << 4) | ((worldY & 15) << 8);
+            // Write unconditionally (BFS relies on the layer-sync side effects), but only fire the
+            // render notification when the stored value actually changed -- perpetual recomputation
+            // (fluid churn etc.) must not re-dirty sections whose light renders identically.
+            final boolean changed = nibble.getUpdating(localIndex) != level;
+            nibble.set(localIndex, level);
+            if (changed) {
+                this.postLightUpdate(sectionIndex, localIndex);
+            }
         }
     }
 
-    protected final void postLightUpdate(final int sectionIndex) {
+    private static final int FACE_NX = 1 << 1;
+    private static final int FACE_PX = 1 << 2;
+    private static final int FACE_NY = 1 << 3;
+    private static final int FACE_PY = 1 << 4;
+    private static final int FACE_NZ = 1 << 5;
+    private static final int FACE_PZ = 1 << 6;
+
+    protected final void postLightUpdate(final int sectionIndex, final int localIndex) {
         if (this.isClientSide & (!this.suppressRenderNotify | this.pendingRenderTarget != null)) {
             this.notifyUpdateCache[sectionIndex] = true;
+            // Remember which section faces the change touched so expandDirtyNotifications only
+            // notifies neighbours that can actually observe it (smooth lighting samples up to one
+            // block across a boundary). Interior changes notify nothing beyond their own section.
+            final int lx = localIndex & 15;
+            final int ly = (localIndex >> 8) & 15;
+            final int lz = (localIndex >> 4) & 15;
+            int mask = 1;
+            if (lx == 0) mask |= FACE_NX; else if (lx == 15) mask |= FACE_PX;
+            if (ly == 0) mask |= FACE_NY; else if (ly == 15) mask |= FACE_PY;
+            if (lz == 0) mask |= FACE_NZ; else if (lz == 15) mask |= FACE_PZ;
+            this.notifyFaceMask[sectionIndex] |= (byte) mask;
         }
     }
 
     /**
-     * Expand dirty notify flags to neighbouring sections. A light change near a section boundary affects rendering in the adjacent section, so we mark a 3x3x3
-     * neighbourhood around each dirty section. Called once in {@link #updateVisible()} before processing.
+     * Notify render sections around light changes. A light change near a section boundary affects rendering in
+     * adjacent sections -- but only when the changed block lies within one block of that boundary, so neighbours
+     * are selected from the per-section face mask recorded by {@link #postLightUpdate} instead of expanding every
+     * dirty section to its full 3x3x3 neighbourhood. Called once in {@link #updateVisible()} before processing.
      */
     private void expandDirtyNotifications() {
         final boolean[] cache = this.notifyUpdateCache;
+        final byte[] faces = this.notifyFaceMask;
         final int len = cache.length;
 
         // Collect dirty indices first to avoid cascading expansion
@@ -407,19 +439,26 @@ public abstract class SupernovaEngine {
         final int totalY = len / 25;
         for (int d = 0; d < dirtyCount; ++d) {
             final int index = dirtyIndices[d];
+            final int mask = faces[index];
+            faces[index] = 0;
+
             final int cx = index % 5;
             final int cz = (index / 5) % 5;
             final int cy = index / 25;
-            for (int dy = -1; dy <= 1; ++dy) {
-                final int ny = cy + dy;
-                if (ny < 0 || ny >= totalY) continue;
-                for (int dz = -1; dz <= 1; ++dz) {
-                    final int nz = cz + dz;
-                    if (nz < 0 || nz >= 5) continue;
-                    for (int dx = -1; dx <= 1; ++dx) {
-                        final int nx = cx + dx;
-                        if (nx < 0 || nx >= 5) continue;
-                        cache[nx + 5 * nz + 25 * ny] = true;
+            for (int dx = -1; dx <= 1; ++dx) {
+                if ((dx < 0 && (mask & FACE_NX) == 0) || (dx > 0 && (mask & FACE_PX) == 0)) continue;
+                final int nx = cx + dx;
+                if (nx < 0 || nx >= 5) continue;
+                for (int dy = -1; dy <= 1; ++dy) {
+                    if ((dy < 0 && (mask & FACE_NY) == 0) || (dy > 0 && (mask & FACE_PY) == 0)) continue;
+                    final int ny = cy + dy;
+                    if (ny < 0 || ny >= totalY) continue;
+                    for (int dz = -1; dz <= 1; ++dz) {
+                        if ((dz < 0 && (mask & FACE_NZ) == 0) || (dz > 0 && (mask & FACE_PZ) == 0)) continue;
+                        if (dx == 0 && dy == 0 && dz == 0) continue;
+                        final int nz = cz + dz;
+                        if (nz < 0 || nz >= 5) continue;
+                        cache[nx + 5 * nz + (5 * 5) * ny] = true;
                     }
                 }
             }

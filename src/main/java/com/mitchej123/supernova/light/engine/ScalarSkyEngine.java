@@ -532,7 +532,6 @@ public class ScalarSkyEngine extends SupernovaEngine {
                 }
 
                 this.setLightLevel(offX, offY, offZ, targetLevel);
-                this.postLightUpdate(sectionIndex);
 
                 if (targetLevel > 1) {
                     if (queueLength >= queue.length) {
@@ -646,7 +645,6 @@ public class ScalarSkyEngine extends SupernovaEngine {
 
                 // Clear this block and continue decrease
                 this.setLightLevel(offX, offY, offZ, 0);
-                this.postLightUpdate(sectionIndex);
 
                 // Sky light has no per-block emission -- just continue decrease
                 if (currentLevel > 1) {

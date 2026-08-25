@@ -299,7 +299,6 @@ public class ScalarBlockEngine extends SupernovaEngine {
                 }
 
                 this.setLightLevel(offX, offY, offZ, targetLevel);
-                this.postLightUpdate(sectionIndex);
 
                 if (targetLevel > 1) {
                     if (queueLength >= queue.length) {
@@ -409,7 +408,6 @@ public class ScalarBlockEngine extends SupernovaEngine {
 
                 // Clear this block
                 this.setLightLevel(offX, offY, offZ, 0);
-                this.postLightUpdate(sectionIndex);
 
                 // Re-apply emission if this block is an emitter
                 final int emission = (block.getLightValue() & 0xF);

@@ -743,8 +743,9 @@ public class SupernovaSkyEngine extends SupernovaRGBEngine {
                 }
 
                 final int newRGB = PackedColorLight.packedMax(targetRGB, currentRGB);
-                this.setLightLevelInCache(sectionIndex, localIndex, newRGB);
-                this.postLightUpdate(sectionIndex);
+                if (this.setLightLevelInCache(sectionIndex, localIndex, newRGB)) {
+                    this.postLightUpdate(sectionIndex, localIndex);
+                }
 
                 if (PackedColorLight.maxComponent(newRGB) > 1) {
                     if (queueLength >= queue.length) {
@@ -863,8 +864,9 @@ public class SupernovaSkyEngine extends SupernovaRGBEngine {
                 final int keptRGB = currentRGB & keptMask;
 
                 // Sky light has no per-block emission
-                this.setLightLevelInCache(sectionIndex, localIndex, keptRGB);
-                this.postLightUpdate(sectionIndex);
+                if (this.setLightLevelInCache(sectionIndex, localIndex, keptRGB)) {
+                    this.postLightUpdate(sectionIndex, localIndex);
+                }
 
                 // Re-increase from remaining light
                 if (keptRGB != 0) {

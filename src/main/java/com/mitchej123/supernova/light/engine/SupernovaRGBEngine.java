@@ -145,25 +145,45 @@ public abstract class SupernovaRGBEngine extends SupernovaEngine {
     @Override
     protected void setLightLevel(final int worldX, final int worldY, final int worldZ, final int packedRGB) {
         final int idx = (worldX >> 4) + 5 * (worldZ >> 4) + (5 * 5) * (worldY >> 4) + this.chunkSectionIndexOffset;
-        setLightLevelInCache(idx, (worldX & 15) | ((worldZ & 15) << 4) | ((worldY & 15) << 8), packedRGB);
-        this.postLightUpdate(idx);
+        final int localIndex = (worldX & 15) | ((worldZ & 15) << 4) | ((worldY & 15) << 8);
+        if (setLightLevelInCache(idx, localIndex, packedRGB)) {
+            this.postLightUpdate(idx, localIndex);
+        }
     }
 
-    protected void setLightLevelInCache(final int idx, final int localIndex, final int packedRGB) {
+    /**
+     * Writes the packed RGB value into the section cache / channel nibbles. The write itself is
+     * unconditional -- BFS passes rely on its layer-sync side effects -- but the return value tells
+     * callers whether any stored byte actually changed, so render notifications can be suppressed
+     * for recomputations that produce identical light (perpetual fluid churn etc.).
+     */
+    protected boolean setLightLevelInCache(final int idx, final int localIndex, final int packedRGB) {
+        boolean changed = false;
         final int[] packed = this.packedRGBCache[idx];
         if (packed != null) {
+            changed = packed[localIndex] != packedRGB;
             packed[localIndex] = packedRGB;
             this.packedCacheDirty[idx] = true;
             this.packedOr[idx] |= packedRGB;
             this.packedAnd[idx] &= packedRGB;
-            return;
+            return changed;
         }
         final SWMRNibbleArray nibR = this.nibbleCacheR[idx];
-        if (nibR != null) nibR.set(localIndex, PackedColorLight.red(packedRGB));
+        if (nibR != null) {
+            changed |= nibR.getUpdating(localIndex) != PackedColorLight.red(packedRGB);
+            nibR.set(localIndex, PackedColorLight.red(packedRGB));
+        }
         final SWMRNibbleArray nibG = this.nibbleCacheG[idx];
-        if (nibG != null) nibG.set(localIndex, PackedColorLight.green(packedRGB));
+        if (nibG != null) {
+            changed |= nibG.getUpdating(localIndex) != PackedColorLight.green(packedRGB);
+            nibG.set(localIndex, PackedColorLight.green(packedRGB));
+        }
         final SWMRNibbleArray nibB = this.nibbleCacheB[idx];
-        if (nibB != null) nibB.set(localIndex, PackedColorLight.blue(packedRGB));
+        if (nibB != null) {
+            changed |= nibB.getUpdating(localIndex) != PackedColorLight.blue(packedRGB);
+            nibB.set(localIndex, PackedColorLight.blue(packedRGB));
+        }
+        return changed;
     }
 
     protected void packSectionToCache(final int idx) {

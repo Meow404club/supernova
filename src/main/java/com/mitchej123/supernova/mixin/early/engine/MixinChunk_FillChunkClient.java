@@ -25,6 +25,11 @@ public abstract class MixinChunk_FillChunkClient implements SupernovaChunk {
 
     @Inject(method = "fillChunk", at = @At("RETURN"))
     private void supernova$onFillChunk(byte[] data, int extractFlags, int chunkY, boolean forceUpdate, CallbackInfo ci) {
+        // forceUpdate is S21PacketChunkData's "full" flag: false means an incremental update for a block change
+        // streamed from the server. Those changes are already propagated by the light engine through setBlock;
+        // re-importing scalar vanilla light here would wipe computed RGB state and queue a pointless full relight
+        // of the chunk on both engines for every streamed update.
+        if (!forceUpdate) return;
         if (this.worldObj == null || !this.worldObj.isRemote) return;
         final WorldLightManager iface = ((SupernovaWorld) this.worldObj).supernova$getLightManager();
         if (iface == null) return;

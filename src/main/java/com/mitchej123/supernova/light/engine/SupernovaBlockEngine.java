@@ -526,8 +526,9 @@ public class SupernovaBlockEngine extends SupernovaRGBEngine {
                 }
 
                 final int newRGB = PackedColorLight.packedMax(targetRGB, currentRGB);
-                this.setLightLevelInCache(sectionIndex, localIndex, newRGB);
-                this.postLightUpdate(sectionIndex);
+                if (this.setLightLevelInCache(sectionIndex, localIndex, newRGB)) {
+                    this.postLightUpdate(sectionIndex, localIndex);
+                }
 
                 if (PackedColorLight.maxComponent(newRGB) > 1) {
                     if (queueLength >= queue.length) {
@@ -643,8 +644,9 @@ public class SupernovaBlockEngine extends SupernovaRGBEngine {
                 final int keptRGB = currentRGB & keptMask;
 
                 // Clear to kept-only during decrease; emission deferred to increase phase
-                this.setLightLevelInCache(sectionIndex, localIndex, keptRGB);
-                this.postLightUpdate(sectionIndex);
+                if (this.setLightLevelInCache(sectionIndex, localIndex, keptRGB)) {
+                    this.postLightUpdate(sectionIndex, localIndex);
+                }
 
                 // Fast path: field read avoids World.getBlock() for non-emitting blocks
                 final int emittedRGB;
