@@ -139,6 +139,8 @@ public final class WorldLightManager {
      */
     public void markAllChunksForRenderUpdate() {
         if (!this.world.isRemote) return;
+        final boolean trace = RenderUpdateTracer.enabled();
+        if (trace) RenderUpdateTracer.beginAllChunks();
         for (final Chunk chunk : this.loadedChunkMap.values()) {
             this.world.markBlockRangeForRenderUpdate(
                     chunk.xPosition << 4,
@@ -148,6 +150,7 @@ public final class WorldLightManager {
                     WorldUtil.getMaxBlockY(),
                     (chunk.zPosition << 4) | 15);
         }
+        if (trace) RenderUpdateTracer.endSelf();
     }
 
     public void unregisterChunk(final int cx, final int cz) {
@@ -191,6 +194,7 @@ public final class WorldLightManager {
     }
 
     public void queueBlockChange(final int x, final int y, final int z) {
+        if (RenderUpdateTracer.enabled()) RenderUpdateTracer.recordQueuePosition(x, y, z);
         if (this.skyQueue != null) this.skyQueue.queueBlockChange(x, y, z);
         if (this.blockQueue != null) this.blockQueue.queueBlockChange(x, y, z);
     }
@@ -227,12 +231,15 @@ public final class WorldLightManager {
 
     public void processClientRenderUpdates() {
         final long startNs = System.nanoTime();
+        final boolean trace = RenderUpdateTracer.enabled();
+        if (trace) RenderUpdateTracer.beginDrain();
         final int count = this.pendingRenderUpdates.drain(v -> {
             final int bx = (int) (v >> 32) << 4;
             final int bz = (short) ((v >> 16) & 0xFFFF) << 4;
             final int by = (short) (v & 0xFFFF) << 4;
             this.world.markBlockRangeForRenderUpdate(bx, by, bz, bx + 15, by + 15, bz + 15);
         });
+        if (trace) RenderUpdateTracer.endSelf();
         if (count > 0) {
             this.stats.drainedSections += count;
             this.stats.drainTimeNs += System.nanoTime() - startNs;

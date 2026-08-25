@@ -1,6 +1,7 @@
 package com.mitchej123.supernova.mixin.early.engine;
 
 import com.mitchej123.supernova.api.ExtendedChunk;
+import com.mitchej123.supernova.light.RenderUpdateTracer;
 import com.mitchej123.supernova.light.WorldLightManager;
 import com.mitchej123.supernova.world.SupernovaWorld;
 import net.minecraft.world.EnumSkyBlock;
@@ -158,5 +159,10 @@ public abstract class MixinWorld implements SupernovaWorld {
     @Redirect(method = "setActivePlayerChunksAndCheckLight", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;func_147451_t(III)Z"))
     private boolean supernova$skipPlayerCheckLight(World world, int x, int y, int z) {
         return true;
+    }
+
+    @Inject(method = "markBlockRangeForRenderUpdate", at = @At("HEAD"))
+    private void supernova$traceRenderMark(int x1, int y1, int z1, int x2, int y2, int z2, CallbackInfo ci) {
+        RenderUpdateTracer.onRenderMark(((World) (Object) this).isRemote, x1, y1, z1, x2, y2, z2);
     }
 }

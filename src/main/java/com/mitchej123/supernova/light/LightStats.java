@@ -171,9 +171,39 @@ public final class LightStats {
             sb.append(" syncSky=").append(this.syncSkyLightCalls);
             sb.append(" syncMs=").append(String.format(Locale.US, "%.1f", this.syncTimeNs / 1_000_000.0));
             sb.append(" engineMarks=").append(engineRenderMarks);
+
+            sb.append(" | sub=").append(RenderUpdateTracer.clientSub);
+            sb.append(" rain=").append(String.format(Locale.US, "%.2f", RenderUpdateTracer.clientRainStrength));
+            sb.append(" time=").append(String.format(Locale.US, "%.0f", RenderUpdateTracer.clientCelestialTime));
+            sb.append(" nightFires=").append(RenderUpdateTracer.nightTriggerFires);
+            sb.append(" marks: drain=").append(RenderUpdateTracer.drainMarks).append('/').append(RenderUpdateTracer.drainSections);
+            sb.append(" allchunks=").append(RenderUpdateTracer.allChunkMarks).append('/').append(RenderUpdateTracer.allChunkSections);
+            sb.append(" ext=").append(RenderUpdateTracer.externalMarks).append('/').append(RenderUpdateTracer.externalSections);
+
+            if (!RenderUpdateTracer.queuePositions.isEmpty()) {
+                final var top = RenderUpdateTracer.queuePositions.long2IntEntrySet().stream()
+                        .sorted((a, b) -> Integer.compare(b.getIntValue(), a.getIntValue())).limit(6)
+                        .toArray(n -> new it.unimi.dsi.fastutil.longs.Long2IntMap.Entry[n]);
+                sb.append(" qtop=");
+                for (int i = 0; i < top.length; i++) {
+                    final long packed = top[i].getLongKey();
+                    if (i > 0) sb.append(',');
+                    sb.append(RenderUpdateTracer.unpackX(packed)).append(',').append(RenderUpdateTracer.unpackY(packed))
+                            .append(',').append(RenderUpdateTracer.unpackZ(packed)).append('*').append(top[i].getIntValue());
+                }
+                if (RenderUpdateTracer.queueHistogramCapped) {
+                    sb.append(" qCAPPED");
+                }
+            }
         }
 
         this.writer.println(sb);
+
+        if ("CLIENT".equals(this.side) && !RenderUpdateTracer.externalOrigins.isEmpty()) {
+            RenderUpdateTracer.externalOrigins.entrySet().stream()
+                    .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue())).limit(8)
+                    .forEach(e -> this.writer.println("    extOrigin x" + e.getValue() + " " + e.getKey()));
+        }
     }
 
     private void reset() {
@@ -193,6 +223,16 @@ public final class LightStats {
         this.syncSkyLightCalls = 0;
         this.syncTimeNs = 0;
         engineRenderMarks = 0;
+        RenderUpdateTracer.nightTriggerFires = 0;
+        RenderUpdateTracer.drainMarks = 0;
+        RenderUpdateTracer.drainSections = 0;
+        RenderUpdateTracer.allChunkMarks = 0;
+        RenderUpdateTracer.allChunkSections = 0;
+        RenderUpdateTracer.externalMarks = 0;
+        RenderUpdateTracer.externalSections = 0;
+        RenderUpdateTracer.queuePositions.clear();
+        RenderUpdateTracer.queueHistogramCapped = false;
+        RenderUpdateTracer.externalOrigins.clear();
         this.edgeBudgetYields.set(0);
         this.blockChangeBudgetYields.set(0);
         this.skyChangeBudgetYields.set(0);

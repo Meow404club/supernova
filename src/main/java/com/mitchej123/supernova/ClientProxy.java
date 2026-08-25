@@ -7,6 +7,7 @@ import com.mitchej123.supernova.client.TintBlendMode;
 import com.mitchej123.supernova.compat.angelica.AngelicaCompat;
 import com.mitchej123.supernova.config.SupernovaClientConfig;
 import com.mitchej123.supernova.config.SupernovaConfig;
+import com.mitchej123.supernova.light.RenderUpdateTracer;
 import com.mitchej123.supernova.world.SupernovaWorld;
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
@@ -92,8 +93,15 @@ public class ClientProxy extends CommonProxy {
                 // Track OUR computed factor, not world.skylightSubtracted -- the client-side field is
                 // not reliably ticked and never changes, which silently disabled this trigger before.
                 final int sub = (int) ColoredLightHelper.currentSkylightSubtracted();
+                final boolean trace = RenderUpdateTracer.enabled();
+                if (trace) {
+                    RenderUpdateTracer.clientSub = sub;
+                    RenderUpdateTracer.clientRainStrength = world.getRainStrength(1.0f);
+                    RenderUpdateTracer.clientCelestialTime = world.getCelestialAngle(1.0f) * 24000f;
+                }
                 if (sub != this.lastSkylightSubtracted) {
                     if (this.lastSkylightSubtracted != -1) {
+                        if (trace) RenderUpdateTracer.nightTriggerFires++;
                         ((SupernovaWorld) world).supernova$getLightManager().markAllChunksForRenderUpdate();
                     }
                     this.lastSkylightSubtracted = sub;
