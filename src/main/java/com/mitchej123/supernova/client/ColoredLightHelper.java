@@ -68,12 +68,15 @@ public final class ColoredLightHelper {
 
     /** Delegates to the currently active {@link TintBlendMode}. */
     static void computeTint(float br, float bg, float bb, float sr, float sg, float sb, float[] out) {
-        // White sky + no block light -> always white tint regardless of blend mode
-        if (sr >= 14.5f && sg >= 14.5f && sb >= 14.5f && br < 0.5f && bg < 0.5f && bb < 0.5f) {
-            out[0] = out[1] = out[2] = 1f;
-            return;
-        }
-        activeTintFunction.computeTint(br, bg, bb, sr, sg, sb, out);
+        // Combine block and sky light per-channel with max before computing the tint ratio: a colored
+        // light source must never darken a channel below the sky/ambient level (#19 -- glowstone-lit
+        // blocks looked darker than pure skylit neighbours in direct sunlight). Color only shows where
+        // the block light exceeds ambient (night, shade, indoors). Sky is passed as zero so every blend
+        // mode degenerates to normalizing the combined color.
+        final float cr = Math.max(br, sr);
+        final float cg = Math.max(bg, sg);
+        final float cb = Math.max(bb, sb);
+        activeTintFunction.computeTint(cr, cg, cb, 0f, 0f, 0f, out);
     }
 
     /**
