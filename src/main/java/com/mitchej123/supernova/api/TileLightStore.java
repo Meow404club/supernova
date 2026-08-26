@@ -52,7 +52,14 @@ public final class TileLightStore {
      * @param z         block z
      * @param packedRGB packed RGB via {@link PackedColorLight#pack(int, int, int)}
      */
+    private static int diagnosticLogs;
+
     public static void put(final int dimId, final int x, final int y, final int z, final int packedRGB) {
+        if (diagnosticLogs < 40) {
+            diagnosticLogs++;
+            com.mitchej123.supernova.Supernova.LOG.info("TileLightStore.put dim={} ({}, {}, {}) = 0x{}",
+                    dimId, x, y, z, Integer.toHexString(packedRGB));
+        }
         if (packedRGB == 0) {
             remove(dimId, x, y, z);
             return;
@@ -69,6 +76,10 @@ public final class TileLightStore {
     }
 
     public static void remove(final int dimId, final int x, final int y, final int z) {
+        if (diagnosticLogs < 40) {
+            diagnosticLogs++;
+            com.mitchej123.supernova.Supernova.LOG.info("TileLightStore.remove dim={} ({}, {}, {})", dimId, x, y, z);
+        }
         final Long2IntMap m = BY_DIM.get(dimId);
         if (m != null) m.remove(key(x, y, z));
     }

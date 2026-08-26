@@ -18,6 +18,8 @@ import java.util.BitSet;
 public final class TileLightRegistry {
 
     private static final BitSet REGISTERED = new BitSet();
+    // Block-keyed source of truth -- see LightColorRegistry.rebuildIdIndexes for why.
+    private static final java.util.Set<Block> REGISTERED_BLOCKS = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
     private TileLightRegistry() {}
 
@@ -28,6 +30,16 @@ public final class TileLightRegistry {
     public static void register(final Block block) {
         final int id = Block.getIdFromBlock(block);
         if (id >= 0) REGISTERED.set(id);
+        REGISTERED_BLOCKS.add(block);
+    }
+
+    /** Re-materialize the id view after numeric block ids changed (EndlessIDs world remap). */
+    public static void rebuildIdIndexes() {
+        REGISTERED.clear();
+        for (final Block block : REGISTERED_BLOCKS) {
+            final int id = Block.getIdFromBlock(block);
+            if (id >= 0) REGISTERED.set(id);
+        }
     }
 
     public static boolean contains(final Block block) {

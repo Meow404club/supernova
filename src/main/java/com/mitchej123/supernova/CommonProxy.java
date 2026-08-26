@@ -1,6 +1,7 @@
 package com.mitchej123.supernova;
 
 import com.mitchej123.supernova.api.LightColorRegistry;
+import com.mitchej123.supernova.api.TileLightRegistry;
 import com.mitchej123.supernova.api.TileLightStore;
 import com.mitchej123.supernova.api.TranslucencyRegistry;
 import com.mitchej123.supernova.config.BlockColorConfig;
@@ -39,6 +40,14 @@ public class CommonProxy {
         DefaultColors.register();
         DefaultTranslucency.register();
         MinecraftForge.EVENT_BUS.register(this);
+    }
+
+    @SubscribeEvent
+    public void onWorldLoad(WorldEvent.Load event) {
+        // EndlessIDs may have remapped numeric block ids for this world; the id-indexed
+        // registration views must be rebuilt from their Block-keyed sources of truth.
+        LightColorRegistry.rebuildIdIndexes();
+        TileLightRegistry.rebuildIdIndexes();
     }
 
     @SubscribeEvent

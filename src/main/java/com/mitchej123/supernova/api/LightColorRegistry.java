@@ -28,6 +28,9 @@ public final class LightColorRegistry {
     // packed+1 per meta (0 = unregistered). length==1 -> wildcard for all metas. Indexed by block ID.
     private static int[][] REGISTRY_BY_ID = new int[0][];
     private static final BitSet HAS_ENTRY = new BitSet();
+    // Block-keyed source of truth: numeric block ids are not stable across EndlessIDs' world-load
+    // remapping, so the id-indexed views above are (re)built from this map.
+    private static final java.util.Map<Block, int[]> REGISTRY_BY_BLOCK = new java.util.IdentityHashMap<>();
     private static final int[] WHITE_BY_LEVEL = new int[16];
 
     /** Flat emission cache indexed by blockId. UNCACHEABLE for positional/interface blocks. */
@@ -112,6 +115,7 @@ public final class LightColorRegistry {
         }
         entry[meta] = scaleToVanillaLight(PackedColorLight.pack(r, g, b), block.getLightValue()) + 1; // +1 so 0 = unregistered
         REGISTRY_BY_ID[id] = entry;
+        REGISTRY_BY_BLOCK.put(block, entry);
         markEntry(block);
     }
 
@@ -127,6 +131,7 @@ public final class LightColorRegistry {
         final int id = Block.getIdFromBlock(block);
         ensureCapacity(id);
         REGISTRY_BY_ID[id] = new int[] { scaleToVanillaLight(PackedColorLight.pack(r, g, b), block.getLightValue()) + 1 };
+        REGISTRY_BY_BLOCK.put(block, REGISTRY_BY_ID[id]);
         markEntry(block);
     }
 
@@ -373,6 +378,23 @@ public final class LightColorRegistry {
         }
 
         Supernova.LOG.info("LightColorRegistry: cached emission for {} uniform + {} per-meta blocks", cachedUniform, cachedPerMeta);
+        rebuildIdIndexes();
+    }
+
+    /**
+     * Re-materialize the id-indexed registry views from the Block-keyed source of truth. Must be
+     * called whenever numeric block ids may have changed -- EndlessIDs remaps them per world.
+     */
+    public static void rebuildIdIndexes() {
+        REGISTRY_BY_ID = new int[0][];
+        HAS_ENTRY.clear();
+        for (final java.util.Map.Entry<Block, int[]> e : REGISTRY_BY_BLOCK.entrySet()) {
+            final int id = Block.getIdFromBlock(e.getKey());
+            if (id < 0) continue;
+            ensureCapacity(id);
+            REGISTRY_BY_ID[id] = e.getValue();
+            HAS_ENTRY.set(id);
+        }
     }
 
     /** ECL spacer bits (4, 9, 14, 19) must be zero in valid {@code 0RRRR 0GGGG 0BBBB 0LLLL} format. */
