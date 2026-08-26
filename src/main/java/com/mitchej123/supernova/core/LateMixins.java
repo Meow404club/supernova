@@ -11,6 +11,24 @@ public enum LateMixins implements IMixins {
             .setPhase(IBaseTransformer.Phase.LATE)
             .addRequiredMod(TargetedMods.ANGELICA)
             .addClientMixins("rendering.MixinRenderSectionManager")),
+
+    // Tile-light bridges must stay LATE: modId-only detection is only supported after mod jars are
+    // attached to the launch classloader (see the note in Mixins).
+    FORGE_MULTIPART(new MixinBuilder("Forge Multipart tile-light bridge")
+            .setPhase(IBaseTransformer.Phase.LATE)
+            .addRequiredMod(TargetedMods.FMP)
+            .addCommonMixins(
+                    "fmp.MixinTileMultipart",
+                    "fmp.MixinBlockMultipart")),
+
+    PROJECTRED_ILLUMINATION(new MixinBuilder("ProjectRed Illumination tile-light bridge")
+            .setPhase(IBaseTransformer.Phase.LATE)
+            .addRequiredMod(TargetedMods.PROJRED_ILLUMINATION)
+            .addCommonMixins(
+                    "projectred.MixinProjectRedLamp",
+                    "projectred.MixinBaseLightPart",
+                    "projectred.MixinLightButtonPart",
+                    "projectred.MixinFLightButtonPart")),
     ;
 
     private final MixinBuilder builder;

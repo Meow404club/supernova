@@ -1,9 +1,11 @@
 package com.mitchej123.supernova.mixin.early.engine;
 
 import com.mitchej123.supernova.api.ExtendedChunk;
+import com.mitchej123.supernova.api.TileLightPublisher;
 import com.mitchej123.supernova.light.RenderUpdateTracer;
 import com.mitchej123.supernova.light.WorldLightManager;
 import com.mitchej123.supernova.world.SupernovaWorld;
+import net.minecraft.block.Block;
 import net.minecraft.world.EnumSkyBlock;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldProvider;
@@ -105,7 +107,15 @@ public abstract class MixinWorld implements SupernovaWorld {
         final WorldLightManager iface = this.supernova$getLightManager();
         if (iface == null) return false;
 
-        if (!((World) (Object) this).isRemote) {
+        // Main-thread resync of tile-driven emission: part state changes (redstone toggles) relight
+        // without firing notifyPartChange, so TileLightStore would otherwise go stale.
+        final World currentWorld = (World) (Object) this;
+        final Block changedBlock = currentWorld.getBlock(x, y, z);
+        if (changedBlock instanceof TileLightPublisher) {
+            ((TileLightPublisher) changedBlock).supernova$refreshTileLight(currentWorld, x, y, z);
+        }
+
+        if (!currentWorld.isRemote) {
             // Server: enqueue -- worker runs both engines for the position.
             iface.queueBlockChange(x, y, z);
             return true;
@@ -137,7 +147,13 @@ public abstract class MixinWorld implements SupernovaWorld {
         final WorldLightManager iface = this.supernova$getLightManager();
         if (iface == null) return false;
 
-        if (!((World) (Object) this).isRemote) {
+        final World currentWorld = (World) (Object) this;
+        final Block changedBlock = currentWorld.getBlock(x, y, z);
+        if (changedBlock instanceof TileLightPublisher) {
+            ((TileLightPublisher) changedBlock).supernova$refreshTileLight(currentWorld, x, y, z);
+        }
+
+        if (!currentWorld.isRemote) {
             iface.queueBlockChange(x, y, z);
             return true;
         }

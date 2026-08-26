@@ -394,7 +394,7 @@ public final class LightColorRegistry {
     /**
      * Scale a packed RGB so its max channel is at least {@code vanillaLight}, preserving channel ratios.
      */
-    static int scaleToVanillaLight(int packed, int vanillaLight) {
+    public static int scaleToVanillaLight(int packed, int vanillaLight) {
         if (!SupernovaConfig.scaleEmissionToVanillaLight) return packed;
         final int v = vanillaLight & 0xF;
         if (v <= 0) return packed;

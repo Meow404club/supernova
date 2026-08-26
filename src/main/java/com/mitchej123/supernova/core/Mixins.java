@@ -31,15 +31,12 @@ public enum Mixins implements IMixins {
             .addClientMixins("early.rendering.MixinRenderManager")
             .setApplyIf(() -> !SupernovaConfig.isScalarMode())
             .setPhase(Phase.EARLY)
-    ),
-
-    FORGE_MULTIPART(new MixinBuilder("Forge Multipart tile-light bridge")
-            .addCommonMixins(
-                    "early.fmp.MixinTileMultipart",
-                    "early.fmp.MixinBlockMultipart")
-            .addRequiredMod(TargetedMod.FMP)
-            .setPhase(Phase.EARLY)
     );
+
+    // NOTE: never register a modId-only ITargetMod builder in this EARLY enumeration. gtnhmixins
+    // validates every referenced ITargetMod while loading early mixins, and mod jars are not
+    // attached to the launch classloader yet -- the resulting IllegalArgumentException aborts
+    // getEarlyMixins for ALL builders (empty mixin list), not just the offending one.
 
     private final MixinBuilder builder;
 

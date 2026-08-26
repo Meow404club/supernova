@@ -11,7 +11,8 @@ public enum TargetedMod implements ITargetMod {
     // modId detection only: targetClass detection Class.forName's the class during the EARLY phase,
     // before FML attaches mod jars to the launch classloader -- the failed lookup poisons
     // LaunchClassLoader.invalidClasses and every later load of the class throws a cached CNFE.
-    FMP(null, "ForgeMultipart");
+    FMP(null, "ForgeMultipart"),
+    PROJRED_ILLUMINATION(null, "ProjRed|Illumination");
 
     private final TargetModBuilder builder;
 
