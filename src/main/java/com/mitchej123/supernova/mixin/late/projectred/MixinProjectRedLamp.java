@@ -23,6 +23,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(targets = "mrtjp.projectred.illumination.BlockLamp$", remap = false)
 public abstract class MixinProjectRedLamp {
 
+    @org.spongepowered.asm.mixin.Unique
+    private static boolean supernova$loggedFirstPublish;
+
     @Inject(method = "setLightValue", at = @At("RETURN"), require = 0)
     private void supernova$onSetLightValue(final World world, final int x, final int y, final int z, final int level,
             final int color, final CallbackInfo ci) {
@@ -33,6 +36,11 @@ public abstract class MixinProjectRedLamp {
         if (level <= 0) {
             TileLightStore.remove(world.provider.dimensionId, x, y, z);
             return;
+        }
+        if (!supernova$loggedFirstPublish) {
+            supernova$loggedFirstPublish = true;
+            com.mitchej123.supernova.Supernova.LOG.info(
+                    "ProjectRed lamp bridge published first entry at ({}, {}, {})", x, y, z);
         }
         final Block block = world.getBlock(x, y, z);
         if (!ProjectRedColors.isLampBlock(block)) return;

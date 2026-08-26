@@ -26,6 +26,7 @@ public enum LateMixins implements IMixins {
             .addRequiredMod(TargetedMods.PROJRED_ILLUMINATION)
             .addCommonMixins(
                     "projectred.MixinProjectRedLamp",
+                    "projectred.MixinTileLamp",
                     "projectred.MixinBaseLightPart",
                     "projectred.MixinLightButtonPart",
                     "projectred.MixinFLightButtonPart")),

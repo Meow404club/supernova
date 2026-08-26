@@ -2,6 +2,7 @@ package com.mitchej123.supernova.compat.colors;
 
 import com.mitchej123.supernova.Supernova;
 import com.mitchej123.supernova.api.LightColors;
+import com.mitchej123.supernova.api.LightColorRegistry;
 import com.mitchej123.supernova.api.TileLightRegistry;
 import cpw.mods.fml.common.registry.GameRegistry;
 import net.minecraft.block.Block;
@@ -9,10 +10,10 @@ import net.minecraft.block.Block;
 /**
  * ProjectRed Illumination -- lamps and floating light blocks. Meta 0-15 follows wool metadata order (White, Orange, Magenta, ..., Black).
  * <p>
- * Lit state is NOT in the metadata: GTNH ProjectRed keeps a per-World side table populated from
- * {@code TileLamp}/{@code LightMicroblock} lifecycle code, so these blocks are routed through
- * {@link TileLightRegistry}/{@code TileLightStore} (published by {@code MixinProjectRedLamp})
- * instead of static color registration.
+ * Full-block lamps keep lit state in their tile entity ({@code inverted != powered}), never in the
+ * block metadata (bit 4 is only the inverted flag), so they are routed through
+ * {@link TileLightRegistry}/{@code TileLightStore} (published by {@code MixinProjectRedLamp} and
+ * {@code MixinTileLamp}) instead of static color registration.
  */
 public final class ProjectRedColors {
 
@@ -21,23 +22,28 @@ public final class ProjectRedColors {
     public static void register() {
         final Block lamp = GameRegistry.findBlock("ProjRed|Illumination", "projectred.illumination.lamp");
         final Block airous = GameRegistry.findBlock("ProjRed|Illumination", "projectred.illumination.airousLight");
-        int count = 0;
-        if (lamp != null) count++;
-        if (airous != null) count++;
 
-        lampBlocks = new Block[count];
-        int i = 0;
         if (lamp != null) {
             TileLightRegistry.register(lamp);
-            lampBlocks[i++] = lamp;
-        }
-        if (airous != null) {
-            TileLightRegistry.register(airous);
-            lampBlocks[i] = airous;
+            lampBlocks = new Block[] {lamp};
+        } else {
+            lampBlocks = new Block[0];
         }
 
-        if (count > 0) {
-            Supernova.LOG.info("Registered {} ProjectRed Illumination blocks as tile-light sources", count);
+        // Airous lights are invisible blocks a fixture scatters while it is on; PR itself removes
+        // them (setBlockToAir) when the source turns off, so the block's existence IS the lit
+        // state and its metadata IS the wool-order color -- static registration is exact here.
+        // They previously sat in the TileLightRegistry with no publisher and never lit.
+        int count = 0;
+        if (airous != null) {
+            for (int meta = 0; meta < 16; meta++) {
+                LightColorRegistry.register(airous, meta, LightColors.BRIGHT_DYE_PALETTE[meta]);
+                count++;
+            }
+        }
+
+        if (count > 0 || lampBlocks.length > 0) {
+            Supernova.LOG.info("Registered {} ProjectRed Illumination light sources", lampBlocks.length + count);
         }
     }
 
