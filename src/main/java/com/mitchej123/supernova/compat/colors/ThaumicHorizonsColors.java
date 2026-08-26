@@ -13,8 +13,37 @@ public final class ThaumicHorizonsColors {
 
     private static final String MOD = "ThaumicHorizons";
 
+    /**
+     * Focus light orbs (light/lightSolar) keep their color as ItemDye damage in metadata 0-15.
+     * Values derived from the vanilla fleece color table (EntitySheep.fleeceColorTable, reversed
+     * into dye damage order) with each color's brightest channel normalized to the orbs'
+     * positional light level of 14. An earlier hand-written table mapped yellow/lime to plain
+     * white -- do not eyeball these, recompute from the table when adjusting.
+     */
+    static final int[] DYE_DAMAGE_PALETTE = {
+            0x0C0C0E, // 0 black
+            0x0E0504, // 1 red
+            0x090E05, // 2 green
+            0x0E0905, // 3 brown
+            0x03040E, // 4 blue
+            0x09040E, // 5 purple
+            0x020C0E, // 6 cyan
+            0x0E0E0E, // 7 silver
+            0x0D0D0E, // 8 gray
+            0x0E070A, // 9 pink
+            0x090E04, // 10 lime
+            0x0E0D03, // 11 yellow
+            0x04070E, // 12 light blue
+            0x0D030E, // 13 magenta
+            0x0E0803, // 14 orange
+            0x0E0E0E, // 15 white
+    };
+
     public static void register() {
         int count = 0;
+
+        count += ColorRegistrationHelper.registerPerMeta(MOD, "light", DYE_DAMAGE_PALETTE);
+        count += ColorRegistrationHelper.registerPerMeta(MOD, "lightSolar", DYE_DAMAGE_PALETTE);
 
         // Uniform blocks
         count += ColorRegistrationHelper.registerBlock(MOD, "alchemite", 8, 6, 2);
