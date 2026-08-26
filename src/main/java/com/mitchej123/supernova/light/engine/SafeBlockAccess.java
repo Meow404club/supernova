@@ -32,7 +32,8 @@ public final class SafeBlockAccess implements IBlockAccess, DimensionedBlockAcce
     }
 
     private Chunk getChunk(final int cx, final int cz) {
-        return this.chunkMap.get(((long) cx << 32) | (cz & 0xFFFFFFFFL));
+        // Must match CoordinateUtils.getChunkKey: z in the high half, x in the low half.
+        return this.chunkMap.get(((long) cz << 32) | (cx & 0xFFFFFFFFL));
     }
 
     @Override

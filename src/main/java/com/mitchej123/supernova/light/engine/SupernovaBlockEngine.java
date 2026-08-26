@@ -144,6 +144,7 @@ public class SupernovaBlockEngine extends SupernovaRGBEngine {
         final Block block = this.getBlock(worldX, worldY, worldZ);
         final int meta = this.getBlockMeta(worldX, worldY, worldZ);
         final int emittedRGB = LightColorRegistry.getPackedEmission(this.safeBlockAccess, block, meta, worldX, worldY, worldZ);
+        supernova$logCheckBlock(worldX, worldY, worldZ, block, meta, emittedRGB, currentRGB);
 
         final int calculatedRGB = this.calculateLightValueWithBlock(worldX, worldY, worldZ, PackedColorLight.ALL_CHANNELS, block, meta);
         // Early out: if current value already matches full expectation, nothing changed
@@ -456,6 +457,22 @@ public class SupernovaBlockEngine extends SupernovaRGBEngine {
             }
         }
     }
+
+    private static void supernova$logCheckBlock(final int x, final int y, final int z, final Block block,
+            final int meta, final int emittedRGB, final int currentRGB) {
+        final Object name = Block.blockRegistry.getNameForObject(block);
+        final java.util.concurrent.atomic.AtomicInteger perBlock =
+                supernova$diagnosticCountPerBlock.computeIfAbsent(name, k -> new java.util.concurrent.atomic.AtomicInteger());
+        if (perBlock.get() >= 8) return;
+        perBlock.incrementAndGet();
+        com.mitchej123.supernova.Supernova.LOG.info(
+                "checkBlock ({}, {}, {}) {} meta={} emitted=0x{} current=0x{}",
+                x, y, z, name, meta,
+                Integer.toHexString(emittedRGB), Integer.toHexString(currentRGB));
+    }
+
+    private static final java.util.concurrent.ConcurrentHashMap<Object, java.util.concurrent.atomic.AtomicInteger>
+            supernova$diagnosticCountPerBlock = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Override
     protected void performLightIncrease() {

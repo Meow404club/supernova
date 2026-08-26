@@ -265,13 +265,22 @@ public abstract class SupernovaEngine {
             if (!this.notifyUpdateCache[index] && (nibble == null || !nibble.isDirty())) {
                 continue;
             }
+            final int cxLocal = index % 5;
+            final int czLocal = (index / 5) % 5;
             if (nibble != null) {
                 nibble.updateVisible();
             }
             this.onNibbleVisible(index, nibble);
+            if (!this.isClientSide) {
+                // Worker-side light writes are invisible to the save system otherwise: nothing
+                // else marks the chunk dirty for incremental updates, so lit store/registry-driven
+                // sources silently reverted to darkness on every reload.
+                final Chunk dirtyChunk = this.chunkCache[cxLocal + 5 * czLocal];
+                if (dirtyChunk != null) {
+                    dirtyChunk.setChunkModified();
+                }
+            }
             if (this.notifyUpdateCache[index] && this.isClientSide) {
-                final int cxLocal = index % 5;
-                final int czLocal = (index / 5) % 5;
                 final int cyLocal = index / 25;
                 if (!this.suppressRenderNotify) {
                     final int sectionX = (cxLocal - this.chunkOffsetX) << 4;
