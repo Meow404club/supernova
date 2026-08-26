@@ -72,11 +72,8 @@ public abstract class SupernovaEngine {
     protected final ExtendedBlockStorage[] sectionCache;
     protected final SWMRNibbleArray[] nibbleCache;
     protected final boolean[] notifyUpdateCache;
-    /** Per-section bitmask of which faces a light change touched (see FACE_* constants); drives boundary-aware render notification. */
-    protected final byte[] notifyFaceMask;
     protected final Chunk[] chunkCache = new Chunk[5 * 5];
     protected final boolean[][] emptinessMapCache = new boolean[5 * 5][];
-    private int[] dirtyIndicesBuffer = new int[64];
 
     protected byte[][] blockB1Cache;          // [cacheSize] -> byte[4096] (block ID bits 0-7)
     protected NibbleArray[] blockB2LowCache;  // [cacheSize] -> NibbleArray (block ID bits 8-11)
@@ -159,7 +156,6 @@ public abstract class SupernovaEngine {
         this.sectionCache = new ExtendedBlockStorage[cacheSize];
         this.nibbleCache = new SWMRNibbleArray[cacheSize];
         this.notifyUpdateCache = new boolean[cacheSize];
-        this.notifyFaceMask = new byte[cacheSize];
         this.blockB1Cache = new byte[cacheSize][];
         this.blockB2LowCache = new NibbleArray[cacheSize];
         this.blockMaskCache = new int[cacheSize];
@@ -264,7 +260,6 @@ public abstract class SupernovaEngine {
     }
 
     protected final void updateVisible() {
-        this.expandDirtyNotifications();
         for (int index = 0, max = this.nibbleCache.length; index < max; ++index) {
             final SWMRNibbleArray nibble = this.nibbleCache[index];
             if (!this.notifyUpdateCache[index] && (nibble == null || !nibble.isDirty())) {
@@ -305,7 +300,6 @@ public abstract class SupernovaEngine {
         Arrays.fill(this.blockMaskCache, 0);
         if (this.isClientSide) {
             Arrays.fill(this.notifyUpdateCache, false);
-            Arrays.fill(this.notifyFaceMask, (byte) 0);
         }
         this.queueOverflowWarned = false;
         this.queueOverflowed = false;
@@ -321,11 +315,15 @@ public abstract class SupernovaEngine {
      * Inline block ID decode bypassing EndlessIDs dispatch. Falls back to getBlockByExtId when EID is not present or for rare 16/24-bit IDs.
      */
     protected final Block getBlockFast(final int sectionIndex, final int x, final int y, final int z) {
+        final ExtendedBlockStorage section = this.sectionCache[sectionIndex];
+        if (section == null || section.isEmpty()) {
+            // Empty sections are all air by definition -- skip any ID decode (Starlight's hasOnlyAir fast path)
+            return Blocks.air;
+        }
         final byte[] b1 = this.blockB1Cache[sectionIndex];
         if (b1 == null) {
             // No cached B1 -- either section is null or EID not present, fall back
-            final ExtendedBlockStorage section = this.sectionCache[sectionIndex];
-            return section != null ? section.getBlockByExtId(x, y, z) : Blocks.air;
+            return section.getBlockByExtId(x, y, z);
         }
         final int index = y << 8 | z << 4 | x;
         int id = b1[index] & 0xFF;
@@ -386,79 +384,30 @@ public abstract class SupernovaEngine {
         }
     }
 
-    private static final int FACE_NX = 1 << 1;
-    private static final int FACE_PX = 1 << 2;
-    private static final int FACE_NY = 1 << 3;
-    private static final int FACE_PY = 1 << 4;
-    private static final int FACE_NZ = 1 << 5;
-    private static final int FACE_PZ = 1 << 6;
-
     protected final void postLightUpdate(final int sectionIndex, final int localIndex) {
         if (this.isClientSide & (!this.suppressRenderNotify | this.pendingRenderTarget != null)) {
-            this.notifyUpdateCache[sectionIndex] = true;
-            // Remember which section faces the change touched so expandDirtyNotifications only
-            // notifies neighbours that can actually observe it (smooth lighting samples up to one
-            // block across a boundary). Interior changes notify nothing beyond their own section.
+            // Mark every section the +-1 block neighbourhood touches -- smooth lighting samples up to
+            // one block across a boundary, so an interior change notifies only its own section while a
+            // change at an edge/corner also notifies the adjacent sections. Same as Starlight's
+            // inline (coord-1)>>4 .. (coord+1)>>4 marking; idempotent, no bookkeeping.
+            final int cx = sectionIndex % 5;
+            final int cz = (sectionIndex / 5) % 5;
+            final int cy = sectionIndex / 25;
             final int lx = localIndex & 15;
             final int ly = (localIndex >> 8) & 15;
             final int lz = (localIndex >> 4) & 15;
-            int mask = 1;
-            if (lx == 0) mask |= FACE_NX; else if (lx == 15) mask |= FACE_PX;
-            if (ly == 0) mask |= FACE_NY; else if (ly == 15) mask |= FACE_PY;
-            if (lz == 0) mask |= FACE_NZ; else if (lz == 15) mask |= FACE_PZ;
-            this.notifyFaceMask[sectionIndex] |= (byte) mask;
-        }
-    }
-
-    /**
-     * Notify render sections around light changes. A light change near a section boundary affects rendering in
-     * adjacent sections -- but only when the changed block lies within one block of that boundary, so neighbours
-     * are selected from the per-section face mask recorded by {@link #postLightUpdate} instead of expanding every
-     * dirty section to its full 3x3x3 neighbourhood. Called once in {@link #updateVisible()} before processing.
-     */
-    private void expandDirtyNotifications() {
-        final boolean[] cache = this.notifyUpdateCache;
-        final byte[] faces = this.notifyFaceMask;
-        final int len = cache.length;
-
-        // Collect dirty indices first to avoid cascading expansion
-        int dirtyCount = 0;
-        for (boolean dirty : cache) {
-            if (dirty) dirtyCount++;
-        }
-        if (dirtyCount == 0) return;
-
-        if (dirtyCount > this.dirtyIndicesBuffer.length) this.dirtyIndicesBuffer = new int[dirtyCount];
-        final int[] dirtyIndices = this.dirtyIndicesBuffer;
-        int idx = 0;
-        for (int i = 0; i < len; ++i) {
-            if (cache[i]) dirtyIndices[idx++] = i;
-        }
-
-        // Max sections per Y layer = 5*5 = 25, totalY = len/25
-        final int totalY = len / 25;
-        for (int d = 0; d < dirtyCount; ++d) {
-            final int index = dirtyIndices[d];
-            final int mask = faces[index];
-            faces[index] = 0;
-
-            final int cx = index % 5;
-            final int cz = (index / 5) % 5;
-            final int cy = index / 25;
-            for (int dx = -1; dx <= 1; ++dx) {
-                if ((dx < 0 && (mask & FACE_NX) == 0) || (dx > 0 && (mask & FACE_PX) == 0)) continue;
-                final int nx = cx + dx;
-                if (nx < 0 || nx >= 5) continue;
-                for (int dy = -1; dy <= 1; ++dy) {
-                    if ((dy < 0 && (mask & FACE_NY) == 0) || (dy > 0 && (mask & FACE_PY) == 0)) continue;
-                    final int ny = cy + dy;
-                    if (ny < 0 || ny >= totalY) continue;
-                    for (int dz = -1; dz <= 1; ++dz) {
-                        if ((dz < 0 && (mask & FACE_NZ) == 0) || (dz > 0 && (mask & FACE_PZ) == 0)) continue;
-                        if (dx == 0 && dy == 0 && dz == 0) continue;
-                        final int nz = cz + dz;
-                        if (nz < 0 || nz >= 5) continue;
-                        cache[nx + 5 * nz + (5 * 5) * ny] = true;
+            final int x1 = lx == 0 ? cx - 1 : cx;
+            final int x2 = lx == 15 ? cx + 1 : cx;
+            final int y1 = ly == 0 ? cy - 1 : cy;
+            final int y2 = ly == 15 ? cy + 1 : cy;
+            final int z1 = lz == 0 ? cz - 1 : cz;
+            final int z2 = lz == 15 ? cz + 1 : cz;
+            final boolean[] cache = this.notifyUpdateCache;
+            final int totalY = cache.length / 25;
+            for (int x = Math.max(x1, 0), xe = Math.min(x2, 4); x <= xe; ++x) {
+                for (int y = Math.max(y1, 0), ye = Math.min(y2, totalY - 1); y <= ye; ++y) {
+                    for (int z = Math.max(z1, 0), ze = Math.min(z2, 4); z <= ze; ++z) {
+                        cache[x + 5 * z + (5 * 5) * y] = true;
                     }
                 }
             }
