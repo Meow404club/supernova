@@ -179,6 +179,7 @@ public final class LightStats {
             sb.append(" marks: drain=").append(RenderUpdateTracer.drainMarks).append('/').append(RenderUpdateTracer.drainSections);
             sb.append(" allchunks=").append(RenderUpdateTracer.allChunkMarks).append('/').append(RenderUpdateTracer.allChunkSections);
             sb.append(" ext=").append(RenderUpdateTracer.externalMarks).append('/').append(RenderUpdateTracer.externalSections);
+            sb.append(" sched=").append(RenderUpdateTracer.internalSchedules);
 
             if (!RenderUpdateTracer.queuePositions.isEmpty()) {
                 final var top = RenderUpdateTracer.queuePositions.long2IntEntrySet().stream()
@@ -193,6 +194,25 @@ public final class LightStats {
                 }
                 if (RenderUpdateTracer.queueHistogramCapped) {
                     sb.append(" qCAPPED");
+                }
+            }
+        }
+
+        if ("CLIENT".equals(this.side)) {
+            sb.append(" sched=").append(RenderUpdateTracer.internalSchedules);
+            if (!RenderUpdateTracer.scheduledSections.isEmpty()) {
+                final var top = RenderUpdateTracer.scheduledSections.long2IntEntrySet().stream()
+                        .sorted((a, b) -> Integer.compare(b.getIntValue(), a.getIntValue())).limit(8)
+                        .toArray(n -> new it.unimi.dsi.fastutil.longs.Long2IntMap.Entry[n]);
+                sb.append(" schedTop=");
+                for (int i = 0; i < top.length; i++) {
+                    final long packed = top[i].getLongKey();
+                    if (i > 0) sb.append(',');
+                    sb.append(RenderUpdateTracer.unpackX(packed)).append(',').append(RenderUpdateTracer.unpackY(packed))
+                            .append(',').append(RenderUpdateTracer.unpackZ(packed)).append('*').append(top[i].getIntValue());
+                }
+                if (RenderUpdateTracer.scheduledSectionsCapped) {
+                    sb.append(" sCAPPED");
                 }
             }
         }
@@ -230,6 +250,9 @@ public final class LightStats {
         RenderUpdateTracer.allChunkSections = 0;
         RenderUpdateTracer.externalMarks = 0;
         RenderUpdateTracer.externalSections = 0;
+        RenderUpdateTracer.internalSchedules = 0;
+        RenderUpdateTracer.scheduledSections.clear();
+        RenderUpdateTracer.scheduledSectionsCapped = false;
         RenderUpdateTracer.queuePositions.clear();
         RenderUpdateTracer.queueHistogramCapped = false;
         RenderUpdateTracer.externalOrigins.clear();

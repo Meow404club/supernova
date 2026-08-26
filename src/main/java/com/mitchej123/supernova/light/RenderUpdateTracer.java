@@ -40,6 +40,10 @@ public final class RenderUpdateTracer {
     /** External mark origin (caller frames) -> count within the window. */
     public static final Map<String, Integer> externalOrigins = new HashMap<>();
 
+    // Celeritas-internal rebuild schedules (captured by the late mixin into RenderSectionManager)
+    public static long internalSchedules;
+    public static final Long2IntOpenHashMap scheduledSections = new Long2IntOpenHashMap();
+    public static boolean scheduledSectionsCapped;
     private RenderUpdateTracer() {}
 
     public static boolean enabled() {
@@ -74,7 +78,7 @@ public final class RenderUpdateTracer {
             default:
                 externalMarks++;
                 externalSections += sections;
-                mergeOrigin(originKey());
+                mergeOrigin(originKey(3));
         }
     }
 
@@ -85,6 +89,17 @@ public final class RenderUpdateTracer {
         }
         final long packed = ((long) (x & 0x3FFFFFF) << 38) | ((long) (z & 0x3FFFFFF) << 12) | (y & 0xFFFL);
         queuePositions.addTo(packed, 1);
+    }
+
+    public static void onInternalSchedule(final int x, final int y, final int z) {
+        if (!SupernovaConfig.enableStatsLog) return;
+        internalSchedules++;
+        final long packed = ((long) (x & 0x3FFFFFF) << 38) | ((long) (z & 0x3FFFFFF) << 12) | (y & 0xFFFL);
+        if (scheduledSections.size() >= 8192 && !scheduledSections.containsKey(packed)) {
+            scheduledSectionsCapped = true;
+        } else {
+            scheduledSections.addTo(packed, 1);
+        }
     }
 
     public static int unpackX(final long packed) {
@@ -108,22 +123,23 @@ public final class RenderUpdateTracer {
     }
 
     /**
-     * First three meaningful caller frames, truncated at the first frame outside net.minecraft -- that frame
-     * identifies the mod (or vanilla entry point) that initiated the mark.
+     * Caller frames leading to the traced entry point, for attributing third-party rebuild/mark storms.
+     * Skips JDK internals, our own classes, and mixin handler frames; keeps up to {@code maxFrames}
+     * meaningful frames so the initiating mod code is visible in context.
      */
-    private static String originKey() {
+    private static String originKey(final int maxFrames) {
         final StackTraceElement[] frames = new Throwable().getStackTrace();
-        final StringBuilder sb = new StringBuilder(96);
+        final StringBuilder sb = new StringBuilder(128);
         int taken = 0;
-        for (int i = 1; i < frames.length && taken < 3; i++) {
+        for (int i = 1; i < frames.length && taken < maxFrames; i++) {
             final String cn = frames[i].getClassName();
             final String mn = frames[i].getMethodName();
-            if (mn.startsWith("supernova$") || mn.equals("onRenderMark") || cn.startsWith("java.")) continue;
+            if (cn.startsWith("java.") || cn.startsWith("jdk.") || cn.startsWith("sun.")) continue;
             if (cn.startsWith("com.mitchej123.supernova.")) continue;
+            if (mn.contains("$")) continue; // mixin handler / lambda bridges
             if (taken > 0) sb.append(" <- ");
             sb.append(cn.substring(cn.lastIndexOf('.') + 1)).append('.').append(mn);
             taken++;
-            if (!cn.startsWith("net.minecraft.")) break;
         }
         return sb.length() == 0 ? "(unknown)" : sb.toString();
     }
