@@ -48,6 +48,8 @@ dependencies {
     devOnlyNonPublishable('com.github.GTNewHorizons:Angelica:2.1.6:dev')
     devOnlyNonPublishable('com.github.GTNewHorizons:Hodgepodge:2.7.109:dev')
     devOnlyNonPublishable('com.github.GTNewHorizons:ForgeMultipart:1.7.10:dev')
+    // IC2 2.2.827-experimental (CurseForge file 2353971)
+    devOnlyNonPublishable(rfg.deobf('curse.maven:ic2-242638:2353971')) { transitive = false }
 
     testImplementation("com.falsepattern:chunkapi-mc1.7.10:0.8.1:dev")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")

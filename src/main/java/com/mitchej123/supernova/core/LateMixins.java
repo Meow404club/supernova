@@ -29,6 +29,14 @@ public enum LateMixins implements IMixins {
                     "projectred.MixinBaseLightPart",
                     "projectred.MixinLightButtonPart",
                     "projectred.MixinFLightButtonPart")),
+
+
+    IC2_CROPS(new MixinBuilder("IC2 crop tile-light bridge")
+            .setPhase(IBaseTransformer.Phase.LATE)
+            .addRequiredMod(TargetedMods.IC2)
+            .addCommonMixins(
+                    "ic2.MixinBlockCrop",
+                    "ic2.MixinTileEntityCrop")),
     ;
 
     private final MixinBuilder builder;

@@ -1,6 +1,7 @@
 package com.mitchej123.supernova.compat.colors;
 
 import com.mitchej123.supernova.Supernova;
+import com.mitchej123.supernova.compat.ic2.IC2Compat;
 import cpw.mods.fml.common.Loader;
 
 public enum ModCompat {
@@ -17,6 +18,7 @@ public enum ModCompat {
     TWILIGHT_FOREST(TwilightForestColors::register, "TwilightForest"),
     NATURA(NaturaColors::register, "Natura"),
     CHISEL(ChiselColors::register, "chisel"),
+    IC2_CROPS(IC2Compat::register, "IC2"),
     WITCHERY(WitcheryColors::register, "witchery"),
     BLOOD_ARSENAL(BloodArsenalColors::register, "BloodArsenal"),
     HEE(HEEColors::register, "HardcoreEnderExpansion"),

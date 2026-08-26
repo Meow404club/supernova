@@ -9,7 +9,8 @@ public enum TargetedMods implements ITargetMod {
     // modId detection only -- see the comment on TargetedMod for why targetClass detection is
     // unsafe before mod jars are attached (and these are LATE-phase anyway, where modId works).
     FMP(null, "ForgeMultipart"),
-    PROJRED_ILLUMINATION(null, "ProjRed|Illumination");
+    PROJRED_ILLUMINATION(null, "ProjRed|Illumination"),
+    IC2(null, "IC2");
 
     private final TargetModBuilder builder;
 
