@@ -19,6 +19,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(World.class)
 public abstract class MixinWorld implements SupernovaWorld {
@@ -169,6 +170,22 @@ public abstract class MixinWorld implements SupernovaWorld {
             iface.scheduleUpdate();
         }
         return true;
+    }
+
+    /**
+     * Vanilla never rechecks light for metadata-only changes (setBlockMetadataWithNotify only
+     * marks renders / notifies neighbors), so blocks that toggle emission purely through metadata
+     * -- e.g. Ender IO electric lights and their light nodes -- never reach the engine. Queue a
+     * block change after a successful metadata write; checkBlock is a no-op when nothing changed.
+     */
+    @Inject(method = "setBlockMetadataWithNotify", at = @At("RETURN"))
+    private void supernova$onMetadataChanged(final int x, final int y, final int z, final int meta, final int flags,
+            final CallbackInfoReturnable<Boolean> cir) {
+        if (!cir.getReturnValue()) return;
+        final WorldLightManager iface = this.supernova$getLightManager();
+        if (iface == null) return;
+        iface.queueBlockChange(x, y, z);
+        iface.scheduleUpdate();
     }
 
     // Kill the random per-tick playerCheckLight fixup in setActivePlayerChunksAndCheckLight.

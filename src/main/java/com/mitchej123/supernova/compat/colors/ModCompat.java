@@ -6,6 +6,7 @@ import cpw.mods.fml.common.Loader;
 public enum ModCompat {
 
     PROJECTRED(ProjectRedColors::register, "ProjRed|Illumination"),
+    ENDER_IO(EnderIOColors::register, "EnderIO"),
     ET_FUTURUM(EtFuturumColors::register, "etfuturum"),
     BOTANIA(BotaniaColors::register, "Botania"),
     THAUMCRAFT(ThaumcraftColors::register, "Thaumcraft"),
