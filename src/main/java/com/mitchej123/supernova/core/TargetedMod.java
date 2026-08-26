@@ -7,10 +7,18 @@ import javax.annotation.Nonnull;
 
 public enum TargetedMod implements ITargetMod {
 
-    ANGELICA("com.gtnewhorizons.angelica.loading.AngelicaTweaker", "angelica");
+    ANGELICA("com.gtnewhorizons.angelica.loading.AngelicaTweaker", "angelica"),
+    // modId detection only: targetClass detection Class.forName's the class during the EARLY phase,
+    // before FML attaches mod jars to the launch classloader -- the failed lookup poisons
+    // LaunchClassLoader.invalidClasses and every later load of the class throws a cached CNFE.
+    FMP(null, "ForgeMultipart");
 
     private final TargetModBuilder builder;
 
+
+    TargetedMod(String targetClass) {
+        this.builder = new TargetModBuilder().setTargetClass(targetClass);
+    }
     TargetedMod(String coreModClass, String modId) {
         this.builder = new TargetModBuilder().setCoreModClass(coreModClass).setModId(modId);
     }

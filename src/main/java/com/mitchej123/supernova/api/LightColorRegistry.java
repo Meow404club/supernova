@@ -149,6 +149,12 @@ public final class LightColorRegistry {
             return ((ColoredLightSource) block).getColoredLightEmission(meta);
         }
 
+        // Tile-light registry: emission published from a tile entity via TileLightStore.
+        if (TileLightRegistry.contains(block)) {
+            final int dim = TileLightStore.dimensionOf(world);
+            return dim == Integer.MIN_VALUE ? 0 : TileLightStore.get(dim, x, y, z);
+        }
+
         // EasyColoredLights auto-detect. The positional overload runs third-party block code
         // that may not tolerate a missing TileEntity -- e.g. Ex Nihilo's crucible NPEs when
         // queried between the block being set and its TE registering -- so degrade to the
@@ -280,6 +286,12 @@ public final class LightColorRegistry {
 
             // PositionalColoredLightSource -- uncacheable (needs world + pos)
             if (block instanceof PositionalColoredLightSource) {
+                EMISSION_CACHE[bid] = UNCACHEABLE;
+                continue;
+            }
+
+            // TileLightRegistry -- uncacheable (sourced from TileLightStore at position)
+            if (TileLightRegistry.contains(bid)) {
                 EMISSION_CACHE[bid] = UNCACHEABLE;
                 continue;
             }
