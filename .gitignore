@@ -38,3 +38,4 @@ layout.json
 
 # Agent workspace
 .agent/
+tmp/
