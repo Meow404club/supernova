@@ -60,7 +60,7 @@ abstract class AbstractSupernovaDataManager implements DataManager.SubChunkDataM
 
     @Override
     public String version() {
-        return "1";
+        return "2";
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.mitchej123.supernova.compat.angelica;
 import com.gtnewhorizons.angelica.api.BlockLightProvider;
 import com.gtnewhorizons.angelica.api.SectionLightData;
 import com.gtnewhorizons.angelica.rendering.celeritas.world.WorldSlice;
+import com.mitchej123.supernova.light.ChunkLightHelper;
 import com.mitchej123.supernova.light.SWMRNibbleArray;
 import com.mitchej123.supernova.light.SupernovaChunk;
 import com.mitchej123.supernova.util.WorldUtil;
@@ -125,10 +126,6 @@ public class SupernovaBlockLightProvider implements BlockLightProvider {
     }
 
     private static int readSkyNibble(SWMRNibbleArray[] nibbles, int idx, int x, int y, int z) {
-        if (nibbles == null) return 15;
-        if (idx < 0 || idx >= nibbles.length) return 15;
-        final SWMRNibbleArray nib = nibbles[idx];
-        if (nib == null || nib.isNullNibbleVisible()) return 15;
-        return nib.getVisible(x, y, z);
+        return ChunkLightHelper.readSkyNibble(nibbles, idx, x, y, z);
     }
 }

@@ -34,12 +34,12 @@ public abstract class MixinTileMultipart {
     // validate/invalidate are vanilla TileEntity overrides: at runtime they carry SRG names
     // (func_145829_t / func_145843_s), so these injectors must remap through the refmap. The
     // mixin-level remap=false only disables the class target mapping (codechicken is a mod class).
-    @Inject(method = "validate", at = @At("RETURN"), remap = true, require = 0)
+    @Inject(method = "validate", at = @At("RETURN"), remap = true, require = 0, expect = 0)
     private void supernova$onValidate(final CallbackInfo ci) {
         supernova$publish();
     }
 
-    @Inject(method = "invalidate", at = @At("RETURN"), remap = true, require = 0)
+    @Inject(method = "invalidate", at = @At("RETURN"), remap = true, require = 0, expect = 0)
     private void supernova$onInvalidate(final CallbackInfo ci) {
         final TileEntity self = (TileEntity) (Object) this;
         if (self.getWorldObj() == null) return;

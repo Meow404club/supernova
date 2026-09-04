@@ -26,7 +26,7 @@ public abstract class MixinProjectRedLamp {
     @org.spongepowered.asm.mixin.Unique
     private static boolean supernova$loggedFirstPublish;
 
-    @Inject(method = "setLightValue", at = @At("RETURN"), require = 0)
+    @Inject(method = "setLightValue", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onSetLightValue(final World world, final int x, final int y, final int z, final int level,
             final int color, final CallbackInfo ci) {
         if (world == null) return;
@@ -48,7 +48,7 @@ public abstract class MixinProjectRedLamp {
         TileLightStore.put(world.provider.dimensionId, x, y, z, packed);
     }
 
-    @Inject(method = "clearLightValue", at = @At("RETURN"), require = 0)
+    @Inject(method = "clearLightValue", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onClearLightValue(final World world, final int x, final int y, final int z, final CallbackInfo ci) {
         if (world == null) return;
         TileLightStore.remove(world.provider.dimensionId, x, y, z);

@@ -40,7 +40,7 @@ public abstract class MixinTileLamp {
     // may be stale (signal not yet readable at the scheduled tick) and no further change ever
     // fires, leaving the store dark forever. Re-publish from the settled fields after every
     // scheduled tick so the store converges without relying on PR's own change detection.
-    @Inject(method = "onScheduledTick", at = @At("TAIL"), require = 0)
+    @Inject(method = "onScheduledTick", at = @At("TAIL"), require = 0, expect = 0)
     private void supernova$republishOnScheduledTick(final CallbackInfo ci) {
         this.supernova$publish();
     }

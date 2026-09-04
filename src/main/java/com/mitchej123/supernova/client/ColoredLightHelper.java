@@ -1,5 +1,6 @@
 package com.mitchej123.supernova.client;
 
+import com.mitchej123.supernova.light.ChunkLightHelper;
 import com.mitchej123.supernova.light.SWMRNibbleArray;
 import com.mitchej123.supernova.light.SupernovaChunk;
 import com.mitchej123.supernova.util.WorldUtil;
@@ -283,10 +284,6 @@ public final class ColoredLightHelper {
     }
 
     private static int readSkyNibble(final SWMRNibbleArray[] nibbles, final int idx, final int x, final int y, final int z) {
-        if (nibbles == null) return 15;
-        if (idx < 0 || idx >= nibbles.length) return 15;
-        final SWMRNibbleArray nib = nibbles[idx];
-        if (nib == null || nib.isNullNibbleVisible()) return 15;
-        return nib.getVisible(x, y, z);
+        return ChunkLightHelper.readSkyNibble(nibbles, idx, x, y, z);
     }
 }

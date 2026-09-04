@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = RenderSectionManager.class, remap = false)
 public abstract class MixinRenderSectionManager {
 
-    @Inject(method = "scheduleSectionForRebuild", at = @At("HEAD"), require = 0)
+    @Inject(method = "scheduleSectionForRebuild", at = @At("HEAD"), require = 0, expect = 0)
     private void supernova$traceScheduleRebuild(int x, int y, int z, boolean important, CallbackInfo ci) {
         RenderUpdateTracer.onInternalSchedule(x, y, z);
     }

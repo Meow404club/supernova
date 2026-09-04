@@ -4,6 +4,7 @@ import com.mitchej123.supernova.api.ExtendedChunk;
 import com.mitchej123.supernova.api.TileLightPublisher;
 import com.mitchej123.supernova.light.RenderUpdateTracer;
 import com.mitchej123.supernova.light.WorldLightManager;
+import com.mitchej123.supernova.light.SupernovaChunk;
 import com.mitchej123.supernova.world.SupernovaWorld;
 import net.minecraft.block.Block;
 import net.minecraft.world.EnumSkyBlock;
@@ -108,6 +109,10 @@ public abstract class MixinWorld implements SupernovaWorld {
         final WorldLightManager iface = this.supernova$getLightManager();
         if (iface == null) return false;
 
+        if (supernova$skipUnpopulatedLight(x, z)) {
+            return true;
+        }
+
         // Main-thread resync of tile-driven emission: part state changes (redstone toggles) relight
         // without firing notifyPartChange, so TileLightStore would otherwise go stale.
         final World currentWorld = (World) (Object) this;
@@ -148,6 +153,10 @@ public abstract class MixinWorld implements SupernovaWorld {
         final WorldLightManager iface = this.supernova$getLightManager();
         if (iface == null) return false;
 
+        if (supernova$skipUnpopulatedLight(x, z)) {
+            return true;
+        }
+
         final World currentWorld = (World) (Object) this;
         final Block changedBlock = currentWorld.getBlock(x, y, z);
         if (changedBlock instanceof TileLightPublisher) {
@@ -186,6 +195,12 @@ public abstract class MixinWorld implements SupernovaWorld {
         if (iface == null) return;
         iface.queueBlockChange(x, y, z);
         iface.scheduleUpdate();
+    }
+
+    @Unique
+    private boolean supernova$skipUnpopulatedLight(final int x, final int z) {
+        final Chunk chunk = this.supernova$getAnyChunkImmediately(x >> 4, z >> 4);
+        return chunk != null && !((SupernovaChunk) chunk).isLightReady();
     }
 
     // Kill the random per-tick playerCheckLight fixup in setActivePlayerChunksAndCheckLight.

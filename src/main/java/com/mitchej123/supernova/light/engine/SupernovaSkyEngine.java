@@ -119,6 +119,13 @@ public class SupernovaSkyEngine extends SupernovaRGBEngine {
             return;
         }
 
+        if (chunkY >= this.minSection && chunkY <= this.maxSection
+                && emptinessMap != null && emptinessMap[chunkY - this.minSection]) {
+            currNibble.setNonNull();
+            currNibble.setZero();
+            return;
+        }
+
         if (extrude) {
             for (int currY = chunkY + 1; currY <= this.maxLightSection; ++currY) {
                 final SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, currY, chunkZ);
@@ -577,6 +584,23 @@ public class SupernovaSkyEngine extends SupernovaRGBEngine {
             this.propagateNeighbourLevels(chunk, this.minLightSection, highestNonEmptySection);
             this.performLightIncrease();
         }
+        this.zeroUninitialisedSkyBelow(chunkX, chunkZ, highestNonEmptySection);
+    }
+
+    private void zeroUninitialisedSkyBelow(final int chunkX, final int chunkZ, final int highestNonEmpty) {
+        for (int cy = this.minLightSection; cy <= highestNonEmpty; ++cy) {
+            final int idx = chunkX + 5 * chunkZ + (5 * 5) * cy + this.chunkSectionIndexOffset;
+            zeroIfUnlit(this.nibbleCache[idx]);
+            zeroIfUnlit(this.nibbleCacheG[idx]);
+            zeroIfUnlit(this.nibbleCacheB[idx]);
+        }
+    }
+
+    private static void zeroIfUnlit(final SWMRNibbleArray nib) {
+        if (nib != null && (nib.isNullNibbleUpdating() || nib.isUninitialisedUpdating())) {
+            nib.setNonNull();
+            nib.setZero();
+        }
     }
 
     private void applyDelayedQueue(final long[] queue, final int len, final boolean usePackedLevel) {
@@ -620,18 +644,14 @@ public class SupernovaSkyEngine extends SupernovaRGBEngine {
 
             // Check if light can pass DOWN through the above block
             final int aboveOpacity = above.getLightOpacity();
-            if (aboveOpacity > 0) {
-                if (!FaceOcclusion.hasSidedTransparency(above) || FaceOcclusion.isFaceSolid(above, aboveMeta, 5)) {
-                    break;
-                }
+            if (aboveOpacity > 0 && FaceOcclusion.blocksSkyColumn(above, aboveMeta, 5)) {
+                break;
             }
 
             // Check if light can enter the current block from above
             final int currentOpacity = current.getLightOpacity();
-            if (currentOpacity > 0) {
-                if (!FaceOcclusion.hasSidedTransparency(current) || FaceOcclusion.isFaceSolid(current, meta, 4)) {
-                    break;
-                }
+            if (currentOpacity > 0 && FaceOcclusion.blocksSkyColumn(current, meta, 4)) {
+                break;
             }
 
             // Apply per-channel absorption for the current block

@@ -10,22 +10,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(targets = "mrtjp.projectred.illumination.FLightButtonPart", remap = false)
 public abstract class MixinFLightButtonPart {
 
-    @Inject(method = "onAdded", at = @At("RETURN"), require = 0)
+    @Inject(method = "onAdded", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onAdded(final CallbackInfo ci) {
         supernova$refresh();
     }
 
-    @Inject(method = "checkAndUpdatePower", at = @At("RETURN"), require = 0)
+    @Inject(method = "checkAndUpdatePower", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onPowerChanged(final CallbackInfo ci) {
         supernova$refresh();
     }
 
-    @Inject(method = "readDesc", at = @At("RETURN"), require = 0)
+    @Inject(method = "readDesc", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onReadDesc(final codechicken.lib.data.MCDataInput input, final CallbackInfo ci) {
         supernova$refresh();
     }
 
-    @Inject(method = "read(Lcodechicken/lib/data/MCDataInput;I)V", at = @At("RETURN"), require = 0)
+    @Inject(method = "read(Lcodechicken/lib/data/MCDataInput;I)V", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onReadUpdate(final codechicken.lib.data.MCDataInput input, final int key,
             final CallbackInfo ci) {
         supernova$refresh();

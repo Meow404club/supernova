@@ -52,6 +52,17 @@ public final class FaceOcclusion {
     }
 
     /**
+     * True when sky cannot continue down through this face. Opaque cubes and solid
+     * sided faces stop the column. Fluids and other uniformly non-solid blocks do not.
+     */
+    public static boolean blocksSkyColumn(final Block block, final int meta, final int axisDir) {
+        if (block.isOpaqueCube()) {
+            return true;
+        }
+        return hasSidedTransparency(block) && isFaceSolid(block, meta, axisDir);
+    }
+
+    /**
      * Returns true if the given face of a non-interface block is solid (blocks light).
      * Only valid when {@link #hasSidedTransparency(Block)} returns true and the block does NOT implement {@link FaceLightOcclusion}.
      */
@@ -174,7 +185,9 @@ public final class FaceOcclusion {
                 }
             }
 
-            if (anySidedDifference) {
+            // Mixed solid/open faces only (stairs, slabs). Water/ice have no solid faces
+            // and must keep vanilla opacity (3), not the fence-style 1-per-block decay.
+            if (anySidedDifference && (bits0 != 0 || bits1 != 0)) {
                 if (id >= FACE_SOLIDITY.length) {
                     final long[][] old = FACE_SOLIDITY;
                     FACE_SOLIDITY = new long[Math.max(id + 1, old.length * 2)][];

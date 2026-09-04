@@ -158,23 +158,43 @@ public final class ChunkLightHelper {
         }
 
         final int idx = sectionY - minLightSection;
-        final SWMRNibbleArray nibR = skyR[idx];
-        if (nibR == null || nibR.isNullNibbleVisible() || nibR.isUninitialisedVisible()) {
-            return 15;
-        }
-        final int r = nibR.getVisible(x, y, z);
-
+        final int r = readSkyNibble(skyR, idx, x, y, z);
         if (skyG == null) {
             return r;
         }
-
-        int g = r, b = r;
-        final SWMRNibbleArray nibG = skyG[idx];
-        if (nibG != null && !nibG.isNullNibbleVisible()) g = nibG.getVisible(x, y, z);
-        if (skyB != null) {
-            final SWMRNibbleArray nibB = skyB[idx];
-            if (nibB != null && !nibB.isNullNibbleVisible()) b = nibB.getVisible(x, y, z);
-        }
+        final int g = readSkyNibble(skyG, idx, x, y, z);
+        final int b = skyB == null ? r : readSkyNibble(skyB, idx, x, y, z);
         return Math.max(r, Math.max(g, b));
+    }
+
+    /**
+     * Visible sky at a nibble index. Null sections extrude the bottom layer of the first
+     * non-null section above (15 only if none exists). UNINIT is stored zero, not sky 15.
+     */
+    public static int readSkyNibble(final SWMRNibbleArray[] sky, final int idx, final int x, final int y, final int z) {
+        if (sky == null) {
+            return 15;
+        }
+        if (idx < 0 || idx >= sky.length) {
+            return 15;
+        }
+        final SWMRNibbleArray nib = sky[idx];
+        if (nib == null || nib.isNullNibbleVisible()) {
+            for (int i = idx + 1; i < sky.length; ++i) {
+                final SWMRNibbleArray above = sky[i];
+                if (above == null || above.isNullNibbleVisible()) {
+                    continue;
+                }
+                if (above.isUninitialisedVisible()) {
+                    return 0;
+                }
+                return above.getVisible(x & 15, 0, z & 15);
+            }
+            return 15;
+        }
+        if (nib.isUninitialisedVisible()) {
+            return 0;
+        }
+        return nib.getVisible(x, y, z);
     }
 }

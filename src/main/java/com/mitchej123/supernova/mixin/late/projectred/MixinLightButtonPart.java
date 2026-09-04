@@ -31,19 +31,19 @@ public abstract class MixinLightButtonPart implements SupernovaColoredPart {
                 com.mitchej123.supernova.compat.colors.ProjectRedColors.colorForVariant(this.getColor()), level);
     }
 
-    @Inject(method = "onAdded", at = @At("RETURN"), require = 0)
+    @Inject(method = "onAdded", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onAdded(final CallbackInfo ci) {
         if (supernova$isForceButton()) return;
         MultipartLightBridge.refreshAndRelight((codechicken.multipart.TMultiPart) (Object) this);
     }
 
-    @Inject(method = "readDesc", at = @At("RETURN"), require = 0)
+    @Inject(method = "readDesc", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onReadDesc(final codechicken.lib.data.MCDataInput input, final CallbackInfo ci) {
         if (supernova$isForceButton()) return;
         MultipartLightBridge.refreshAndRelight((codechicken.multipart.TMultiPart) (Object) this);
     }
 
-    @Inject(method = "read(Lcodechicken/lib/data/MCDataInput;I)V", at = @At("RETURN"), require = 0)
+    @Inject(method = "read(Lcodechicken/lib/data/MCDataInput;I)V", at = @At("RETURN"), require = 0, expect = 0)
     private void supernova$onReadUpdate(final codechicken.lib.data.MCDataInput input, final int key,
             final CallbackInfo ci) {
         if (supernova$isForceButton()) return;
