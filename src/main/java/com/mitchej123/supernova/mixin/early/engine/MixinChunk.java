@@ -3,6 +3,7 @@ package com.mitchej123.supernova.mixin.early.engine;
 import com.mitchej123.supernova.config.SupernovaConfig;
 import com.mitchej123.supernova.core.SupernovaCore;
 import com.mitchej123.supernova.light.ChunkLightHelper;
+import com.mitchej123.supernova.light.InitialLightPolicy;
 import com.mitchej123.supernova.light.SWMRNibbleArray;
 import com.mitchej123.supernova.light.SupernovaChunk;
 import com.mitchej123.supernova.light.WorldLightManager;
@@ -58,6 +59,8 @@ public abstract class MixinChunk implements SupernovaChunk {
     @Unique private SWMRNibbleArray[] supernova$skyNibblesG;
     @Unique private SWMRNibbleArray[] supernova$skyNibblesB;
     @Unique private volatile boolean supernova$lightReady;
+    @Unique private int supernova$lightEpoch;
+
 
     @Inject(method = "<init>(Lnet/minecraft/world/World;II)V", at = @At("RETURN"))
     private void supernova$onInit(World world, int cx, int cz, CallbackInfo ci) {
@@ -82,37 +85,36 @@ public abstract class MixinChunk implements SupernovaChunk {
         }
     }
 
-    // Import vanilla light data and trigger block engine for chunks without saved RGB data.
+    // Import vanilla light data. Full BFS waits until after populate (GTNH #7).
     @Inject(method = "onChunkLoad", at = @At("HEAD"))
     private void supernova$onChunkLoad(CallbackInfo ci) {
+        // Compute saved-data presence before the no-ChunkAPI import so that import
+        // cannot flip trust. Trust also requires LIGHT_CACHE_EPOCH.
+        final boolean hasSavedBlockData = ChunkLightHelper.hasSavedBlockData(this.supernova$blockNibblesR, this.storageArrays);
+
         if (!SupernovaCore.CHUNKAPI_PRESENT && this.isLightPopulated) {
             ChunkLightHelper.importVanillaBlock(this.supernova$blockNibblesR, null, null, this.storageArrays);
         }
 
-        final boolean hasBlockData = ChunkLightHelper.hasSavedBlockData(this.supernova$blockNibblesR, this.storageArrays);
-
         if (this.worldObj != null) {
             final WorldLightManager iface = ((SupernovaWorld) this.worldObj).supernova$getLightManager();
             if (iface != null) {
-                // Register in ConcurrentHashMap for worker thread access (both client and server)
                 iface.registerChunk((Chunk) (Object) this);
 
-                if (hasBlockData) {
-                    // Chunk has saved Supernova data -- import vanilla sky light where missing and mark ready.
-                    ChunkLightHelper.importVanillaSky(this.supernova$skyNibbles, this.supernova$skyNibblesG, this.supernova$skyNibblesB, this.storageArrays, true);
+                ChunkLightHelper.importVanillaSky(this.supernova$skyNibbles, this.supernova$skyNibblesG, this.supernova$skyNibblesB, this.storageArrays, false);
+
+                final boolean savedEpochValid = this.supernova$lightEpoch == SupernovaChunk.LIGHT_CACHE_EPOCH;
+                if (InitialLightPolicy.shouldTrustSavedLight(this.worldObj.isRemote, this.isTerrainPopulated, savedEpochValid, hasSavedBlockData)) {
                     ((SupernovaChunk) this).setLightReady(true);
-                } else if (!this.worldObj.isRemote) {
-                    // Import vanilla sky so game logic has correct values during BFS backlog
-                    ChunkLightHelper.importVanillaSky(this.supernova$skyNibbles, this.supernova$skyNibblesG, this.supernova$skyNibblesB, this.storageArrays, false);
-                    final Boolean[] emptySections = SupernovaEngine.getEmptySectionsForChunk((Chunk) (Object) this);
-                    iface.queueChunkLight(this.xPosition, this.zPosition, (Chunk) (Object) this, emptySections);
-                    iface.scheduleUpdate();
+                } else if (InitialLightPolicy.shouldQueueFullLight(this.worldObj.isRemote, this.isTerrainPopulated, this.supernova$lightReady)) {
+                    supernova$queueFullLight(iface);
                 }
             }
         }
 
         ChunkLightHelper.syncSkyToVanilla(this.supernova$skyNibbles, this.storageArrays);
     }
+
 
     @Override
     public void syncLightToVanilla() {
@@ -178,6 +180,17 @@ public abstract class MixinChunk implements SupernovaChunk {
 
     @Override
     public void setLightReady(boolean ready) {this.supernova$lightReady = ready;}
+
+    @Override
+    public int getLightEpoch() {
+        return this.supernova$lightEpoch;
+    }
+
+    @Override
+    public void setLightEpoch(int epoch) {
+        this.supernova$lightEpoch = epoch;
+    }
+
 
     // Compute heightmap only; actual lighting deferred to onChunkLoad where neighbor chunks are available for proper edge propagation.
     // @Inject+cancel instead of @Overwrite so other mods' injectors into this method don't crash.
@@ -301,6 +314,18 @@ public abstract class MixinChunk implements SupernovaChunk {
     @Overwrite
     public void func_150809_p() {
         this.isTerrainPopulated = true;
+        supernova$trySetLightPopulated();
+    }
+
+    @Unique
+    private void supernova$queueFullLight(final WorldLightManager iface) {
+        iface.queueChunkLight(this.xPosition, this.zPosition, (Chunk) (Object) this,
+                SupernovaEngine.getEmptySectionsForChunk((Chunk) (Object) this));
+        iface.scheduleUpdate();
+    }
+
+    @Override
+    public void tryMarkLightPopulated() {
         supernova$trySetLightPopulated();
     }
 

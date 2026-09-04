@@ -12,7 +12,10 @@ public enum Mixins implements IMixins {
             .addCommonMixins(
                     "early.engine.MixinChunk",
                     "early.engine.MixinWorld",
-                    "early.engine.MixinWorldServer")
+                    "early.engine.MixinWorldServer",
+                    "early.engine.MixinAnvilChunkLoader",
+                    "early.engine.MixinChunkProviderServer",
+                    "early.engine.MixinEntityPlayerMP")
             .addClientMixins(
                     "early.engine.MixinChunk_FillChunkClient",
                     "early.engine.MixinPlayerControllerMP"

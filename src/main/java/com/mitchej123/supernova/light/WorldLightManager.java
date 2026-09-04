@@ -11,6 +11,7 @@ import com.mitchej123.supernova.light.engine.SupernovaSkyEngine;
 import com.mitchej123.supernova.util.CoordinateUtils;
 import com.mitchej123.supernova.util.SnapshotChunkMap;
 import com.mitchej123.supernova.util.WorldUtil;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -161,6 +162,30 @@ public final class WorldLightManager {
         return this.loadedChunkMap.get(CoordinateUtils.getChunkKey(chunkX, chunkZ));
     }
 
+
+    /**
+     * True when all four horizontal neighbours are loaded and light-ready.
+     * 1.7.10 has no light packet to correct an already-sent chunk.
+     */
+    public boolean areNeighboursLightReady(final int cx, final int cz) {
+        for (int i = 0; i < 4; ++i) {
+            final int nx = cx + ((i == 0) ? 1 : (i == 1) ? -1 : 0);
+            final int nz = cz + ((i == 2) ? 1 : (i == 3) ? -1 : 0);
+            final Chunk neighbour = this.loadedChunkMap.get(CoordinateUtils.getChunkKey(nx, nz));
+            if (neighbour == null || !((SupernovaChunk) neighbour).isLightReady()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static IntOpenHashSet allLightSections() {
+        final IntOpenHashSet set = new IntOpenHashSet();
+        for (int s = WorldUtil.getMinLightSection(); s <= WorldUtil.getMaxLightSection(); ++s) {
+            set.add(s);
+        }
+        return set;
+    }
     private static SupernovaEngine getEngine(final ConcurrentLinkedDeque<SupernovaEngine> cache,
             final Supplier<SupernovaEngine> factory) {
         if (cache == null) return null;
@@ -338,36 +363,49 @@ public final class WorldLightManager {
         skyEngine.setStats(this.stats);
 
         try {
-            // 1. Initial chunk lighting (deferred edges -- neighbor-aware)
-            if (task.initialLightChunk != null) {
-                this.stats.initialLightsRun.incrementAndGet();
-                skyEngine.light(task.initialLightChunk, task.initialLightEmptySections, false);
-                this.completeInitialLighting(task.chunkCoordinate);
-
-                // Edge coalescing: only queue edge checks for the newly-lit chunk, not neighbors. Neighbors will get edge-checked when THEIR next neighbor
-                // arrives. Correctness: propagateNeighbourLevels() during lightChunk() already seeds neighbor light into the new chunk during initial BFS.
-                this.skyQueue.queueEdgeCheckAllSections(cx, cz, true);
-            }
-
-            // 2+3. Combined section + block changes
-            if (task.changedSectionSet != null || (task.changedPositions != null && !task.changedPositions.isEmpty())) {
-                skyEngine.blocksChangedInChunk(cx, cz, task.changedPositions, task.changedSectionSet);
-            }
-
-            // 4. Sky edge checks
-            if (task.queuedEdgeChecksSky != null) {
-                skyEngine.checkChunkEdges(cx, cz, task.queuedEdgeChecksSky);
-            }
-
-            // 5. Overflow requeue
-            if (skyEngine.wasQueueOverflowed()) {
-                if (task.relightAttempts < MAX_RELIGHT_ATTEMPTS) {
-                    final Chunk chunk = this.loadedChunkMap.get(task.chunkCoordinate);
-                    if (chunk != null) {
-                        this.skyQueue.requeueChunkLight(cx, cz, chunk, SupernovaEngine.getEmptySectionsForChunk(chunk), task.relightAttempts);
-                    }
+            final boolean coordinatedTask = task.initialLightChunk != null;
+            final int changedCount = task.changedPositions == null ? 0 : task.changedPositions.size();
+            if (BulkSkyRelightPolicy.shouldPromote(coordinatedTask, changedCount)) {
+                final Chunk loadedChunk = this.loadedChunkMap.get(task.chunkCoordinate);
+                boolean overflowed = true;
+                int attempts = 0;
+                while (overflowed && attempts < MAX_RELIGHT_ATTEMPTS) {
+                    skyEngine.light(loadedChunk, SupernovaEngine.getEmptySectionsForChunk(loadedChunk), false);
+                    overflowed = skyEngine.wasQueueOverflowed();
+                    attempts++;
+                }
+                if (!overflowed) {
+                    this.skyQueue.queueEdgeCheckAllSections(cx, cz, true);
+                    this.scheduleUpdate();
                 } else {
-                    Supernova.LOG.error("Sky engine: chunk ({}, {}) overflowed BFS queue {} times -- giving up.", cx, cz, task.relightAttempts + 1);
+                    Supernova.LOG.error("Sky engine: chunk ({}, {}) overflowed BFS queue {} times -- giving up.", cx, cz, attempts);
+                }
+            } else {
+                if (task.initialLightChunk != null) {
+                    this.stats.initialLightsRun.incrementAndGet();
+                    skyEngine.light(task.initialLightChunk, task.initialLightEmptySections, false);
+                    skyEngine.checkChunkEdges(cx, cz, allLightSections());
+                    this.completeInitialLighting(task.chunkCoordinate);
+                    this.skyQueue.queueEdgeCheckAllSections(cx, cz, true);
+                }
+
+                if (task.changedSectionSet != null || (task.changedPositions != null && !task.changedPositions.isEmpty())) {
+                    skyEngine.blocksChangedInChunk(cx, cz, task.changedPositions, task.changedSectionSet);
+                }
+
+                if (task.queuedEdgeChecksSky != null) {
+                    skyEngine.checkChunkEdges(cx, cz, task.queuedEdgeChecksSky);
+                }
+
+                if (skyEngine.wasQueueOverflowed()) {
+                    if (task.relightAttempts < MAX_RELIGHT_ATTEMPTS) {
+                        final Chunk chunk = this.loadedChunkMap.get(task.chunkCoordinate);
+                        if (chunk != null) {
+                            this.skyQueue.requeueChunkLight(cx, cz, chunk, SupernovaEngine.getEmptySectionsForChunk(chunk), task.relightAttempts);
+                        }
+                    } else {
+                        Supernova.LOG.error("Sky engine: chunk ({}, {}) overflowed BFS queue {} times -- giving up.", cx, cz, task.relightAttempts + 1);
+                    }
                 }
             }
         } catch (final NullPointerException e) {
@@ -423,8 +461,8 @@ public final class WorldLightManager {
                     }
                 }
 
+                blockEngine.checkChunkEdges(cx, cz, allLightSections());
                 this.completeInitialLighting(task.chunkCoordinate);
-                // Enqueue deferred edge checks for all light sections
                 this.blockQueue.queueEdgeCheckAllSections(cx, cz, false);
             }
 
@@ -499,9 +537,20 @@ public final class WorldLightManager {
             synchronized (this.initialLightCompletions) {
                 this.initialLightCompletions.remove(chunkCoordinate);
             }
-            // Sync BFS results to vanilla nibbles so chunk packets carry fully-propagated values
             ((SupernovaChunk) completion.chunk).syncLightToVanilla();
             ((SupernovaChunk) completion.chunk).setLightReady(true);
+            ((SupernovaChunk) completion.chunk).setLightEpoch(SupernovaChunk.LIGHT_CACHE_EPOCH);
+            completion.chunk.setChunkModified();
+            final int cx = CoordinateUtils.getChunkX(chunkCoordinate);
+            final int cz = CoordinateUtils.getChunkZ(chunkCoordinate);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    final Chunk neighbour = this.loadedChunkMap.get(CoordinateUtils.getChunkKey(cx + dx, cz + dz));
+                    if (neighbour != null) {
+                        ((SupernovaChunk) neighbour).tryMarkLightPopulated();
+                    }
+                }
+            }
             completion.future.set(null);
         }
     }

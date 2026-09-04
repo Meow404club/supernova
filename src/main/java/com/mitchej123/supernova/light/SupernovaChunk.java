@@ -6,10 +6,17 @@ import com.mitchej123.supernova.api.ExtendedChunk;
  * Internal extension of {@link ExtendedChunk} exposing nibble storage. Mixed into {@code net.minecraft.world.chunk.Chunk}.
  */
 public interface SupernovaChunk extends ExtendedChunk {
+    int LIGHT_CACHE_EPOCH = 2;
+
+    int getLightEpoch();
+    void setLightEpoch(int epoch);
+
 
     /** Sync Supernova SWMR visible data -> vanilla nibble arrays so chunk packets carry correct values. */
     void syncLightToVanilla();
     void setLightReady(boolean ready);
+    void tryMarkLightPopulated();
+
 
     // Sky light
     SWMRNibbleArray[] getSkyNibbles();
