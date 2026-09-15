@@ -310,9 +310,19 @@ class ChunkLightHelperTest {
         }
 
         @Test
-        void returns15ForUninitNibble() {
+        void returns0ForUninitNibble() {
             SWMRNibbleArray[] skyR = makeEmptyNibbles(); // UNINIT
-            assertEquals(15, ChunkLightHelper.getSkyLight(skyR, null, null, 0, 64, 0));
+            assertEquals(0, ChunkLightHelper.getSkyLight(skyR, null, null, 0, 64, 0));
+        }
+
+        @Test
+        void nullNibbleExtrudesBottomLayerOfSectionAbove() {
+            SWMRNibbleArray[] skyR = makeNullNibbles();
+            skyR[TEST_NIBBLE_IDX].setNonNull();
+            skyR[TEST_NIBBLE_IDX].set(3, 0, 7, 4);
+            skyR[TEST_NIBBLE_IDX].updateVisible();
+            // Y=47 is section 2, nibble idx 3; section 4 (idx 5) sits above.
+            assertEquals(4, ChunkLightHelper.getSkyLight(skyR, null, null, 3, 47, 7));
         }
 
         @Test

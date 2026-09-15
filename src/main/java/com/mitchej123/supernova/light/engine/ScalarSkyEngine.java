@@ -97,18 +97,10 @@ public class ScalarSkyEngine extends SupernovaEngine {
             nibble.setNonNull();
             nibble.setFull();
         } else if (emptinessMap != null && emptinessMap[chunkY - this.minSection]) {
-            // Empty section at or below terrain level
-            if (extrude) {
-                final SWMRNibbleArray above = this.getNibbleFromCache(chunkX, chunkY + 1, chunkZ);
-                if (above != null && above.isFullUpdating()) {
-                    nibble.setFull();
-                } else {
-                    nibble.setNonNull();
-                    nibble.setZero();
-                }
-            } else {
-                nibble.setNonNull();
-            }
+            // All-air section under terrain. Leaving this uninitialised (or copying full sky
+            // from the section above) reads as 15 and lights a 16³ cave pocket.
+            nibble.setNonNull();
+            nibble.setZero();
         } else {
             nibble.setNonNull();
         }
@@ -206,18 +198,14 @@ public class ScalarSkyEngine extends SupernovaEngine {
 
             // Check if light can pass DOWN through the above block
             final int aboveOpacity = above.getLightOpacity();
-            if (aboveOpacity > 0) {
-                if (!FaceOcclusion.hasSidedTransparency(above) || FaceOcclusion.isFaceSolid(above, aboveMeta, 5)) {
-                    break;
-                }
+            if (aboveOpacity > 0 && FaceOcclusion.blocksSkyColumn(above, aboveMeta, 5)) {
+                break;
             }
 
             // Check if light can enter the current block from above
             final int currentOpacity = current.getLightOpacity();
-            if (currentOpacity > 0) {
-                if (!FaceOcclusion.hasSidedTransparency(current) || FaceOcclusion.isFaceSolid(current, meta, 4)) {
-                    break;
-                }
+            if (currentOpacity > 0 && FaceOcclusion.blocksSkyColumn(current, meta, 4)) {
+                break;
             }
 
             if (currentOpacity > 0) {
@@ -439,6 +427,17 @@ public class ScalarSkyEngine extends SupernovaEngine {
             }
             this.propagateNeighbourLevels(chunk, this.minLightSection, highestNonEmptySection);
             this.performLightIncrease();
+        }
+        this.zeroUninitialisedSkyBelow(chunkX, chunkZ, highestNonEmptySection);
+    }
+
+    private void zeroUninitialisedSkyBelow(final int chunkX, final int chunkZ, final int highestNonEmpty) {
+        for (int cy = this.minLightSection; cy <= highestNonEmpty; ++cy) {
+            final SWMRNibbleArray nib = this.getNibbleFromCache(chunkX, cy, chunkZ);
+            if (nib != null && (nib.isNullNibbleUpdating() || nib.isUninitialisedUpdating())) {
+                nib.setNonNull();
+                nib.setZero();
+            }
         }
     }
 

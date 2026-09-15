@@ -642,6 +642,19 @@ public abstract class SupernovaEngine {
                     }
                 }
 
+                int highestNonEmpty = this.minSection - 1;
+                if (this.skylightPropagator) {
+                    final boolean[] columnEmptiness = this.getEmptinessMap(dx + chunkX, dz + chunkZ);
+                    if (columnEmptiness != null) {
+                        for (int cy = this.maxSection; cy >= this.minSection; --cy) {
+                            if (!columnEmptiness[cy - this.minSection]) {
+                                highestNonEmpty = cy;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 for (int sectionY = this.maxLightSection; sectionY >= this.minLightSection; --sectionY) {
                     boolean allEmpty = true;
                     neighbour_search:
@@ -670,7 +683,10 @@ public abstract class SupernovaEngine {
                     }
 
                     if (allEmpty & neighboursLoaded) {
-                        this.setNibbleNull(dx + chunkX, sectionY, dz + chunkZ);
+                        // Null sky below terrain extrudes 15 from open sky (Y=48/64 bands).
+                        if (!this.skylightPropagator || sectionY > highestNonEmpty) {
+                            this.setNibbleNull(dx + chunkX, sectionY, dz + chunkZ);
+                        }
                     } else if (!allEmpty) {
                         final boolean extrude = (dx | dz) != 0 || !unlit;
                         this.initNibble(dx + chunkX, sectionY, dz + chunkZ, extrude, false);

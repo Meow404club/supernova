@@ -37,7 +37,10 @@ public class SupernovaSectionLightData implements SectionLightData {
         final long[] cache = new long[4096];
         for (int idx = 0; idx < 4096; idx++) {
             final int block = allBlockZero ? 0 : (extractNibble(rData, idx) << 8) | (extractNibble(gData, idx) << 4) | extractNibble(bData, idx);
-            final int sky = allSkyWhite ? 0xFFF : (extractSkyNibble(skyRData, idx) << 8) | (extractSkyNibble(skyGData, idx) << 4) | extractSkyNibble(skyBData, idx);
+            final int sr = extractSkyNibble(skyRData, idx);
+            final int sg = skyGData == null ? sr : extractSkyNibble(skyGData, idx);
+            final int sb = skyBData == null ? sr : extractSkyNibble(skyBData, idx);
+            final int sky = allSkyWhite ? 0xFFF : (sr << 8) | (sg << 4) | sb;
             cache[idx] = ((long) (block & 0xFFFF) << 16) | (sky & 0xFFFF);
         }
         this.fusedCache = cache;
@@ -82,7 +85,7 @@ public class SupernovaSectionLightData implements SectionLightData {
     }
 
     private static int extractSkyNibble(byte[] data, int idx) {
-        if (data == null) return 15;
+        if (data == null) return 0;
         return (data[idx >>> 1] >>> ((idx & 1) << 2)) & 0xF;
     }
 }
