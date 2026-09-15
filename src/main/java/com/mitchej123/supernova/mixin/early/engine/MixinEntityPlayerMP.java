@@ -8,7 +8,8 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
 /**
  * 1.7.10 analogue of Pulsar's PlayerChunkMapEntry.sendToPlayers gate.
@@ -16,11 +17,11 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  */
 @Mixin(EntityPlayerMP.class)
 public abstract class MixinEntityPlayerMP {
-    @Redirect(
+    @WrapOperation(
             method = "onUpdate",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/Chunk;func_150802_k()Z"))
-    private boolean supernova$gateChunkSendOnLight(final Chunk chunk) {
-        if (!chunk.func_150802_k()) {
+    private boolean supernova$gateChunkSendOnLight(final Chunk chunk, final Operation<Boolean> original) {
+        if (!original.call(chunk)) {
             return false;
         }
         if (!((SupernovaChunk) chunk).isLightReady()) {

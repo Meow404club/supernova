@@ -63,6 +63,8 @@ public final class WorldLightManager {
     private static final int MAX_RELIGHT_ATTEMPTS = 2;
     private static final long EDGE_CHECK_BUDGET_NS = 10_000_000L; // 10ms wall-clock budget for edge check phase
     private static final long BLOCK_CHANGE_BUDGET_NS = 5_000_000L; // 5ms budget for phase-1 block change drain
+    private static final int[] CARDINAL_DX = { 1, -1, 0, 0 };
+    private static final int[] CARDINAL_DZ = { 0,  0, 1, -1 };
 
     public WorldLightManager(final World world, final boolean hasSkyLight, final boolean hasBlockLight) {
         this.world = world;
@@ -164,15 +166,17 @@ public final class WorldLightManager {
 
 
     /**
-     * True when all four horizontal neighbours are loaded and light-ready.
-     * 1.7.10 has no light packet to correct an already-sent chunk.
+     * True when every loaded cardinal neighbour is light-ready.
+     * Unloaded neighbours do not block; 1.7.10 has no light packet to correct an already-sent chunk.
      */
     public boolean areNeighboursLightReady(final int cx, final int cz) {
         for (int i = 0; i < 4; ++i) {
-            final int nx = cx + ((i == 0) ? 1 : (i == 1) ? -1 : 0);
-            final int nz = cz + ((i == 2) ? 1 : (i == 3) ? -1 : 0);
-            final Chunk neighbour = this.loadedChunkMap.get(CoordinateUtils.getChunkKey(nx, nz));
-            if (neighbour == null || !((SupernovaChunk) neighbour).isLightReady()) {
+            final Chunk neighbour = this.loadedChunkMap.get(
+                    CoordinateUtils.getChunkKey(cx + CARDINAL_DX[i], cz + CARDINAL_DZ[i]));
+            if (neighbour == null) {
+                continue;
+            }
+            if (!((SupernovaChunk) neighbour).isLightReady()) {
                 return false;
             }
         }
@@ -367,6 +371,10 @@ public final class WorldLightManager {
             final int changedCount = task.changedPositions == null ? 0 : task.changedPositions.size();
             if (BulkSkyRelightPolicy.shouldPromote(coordinatedTask, changedCount)) {
                 final Chunk loadedChunk = this.loadedChunkMap.get(task.chunkCoordinate);
+                if (loadedChunk == null) {
+                    this.completeInitialLighting(task.chunkCoordinate);
+                    return;
+                }
                 boolean overflowed = true;
                 int attempts = 0;
                 while (overflowed && attempts < MAX_RELIGHT_ATTEMPTS) {
